@@ -31,10 +31,22 @@ void sha256(const char *input, char outputBuffer[65]) {
     outputBuffer[64] = '\0';
 }
 
-int main(){
-    char outputBuffer[65];
-    sha256("Hello World!", outputBuffer);
-    printf("%d\n", sndmsg("Hello World!", 3000));
-    printf("%d\n", sndmsg(outputBuffer, 3000));
-    return 0;
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s <option> [filename]\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    // Process command-line options
+    if (strcmp(argv[1], "-up") == 0 && argc == 3) {
+        sndmsg(argv[2]);
+    } /*else if (strcmp(argv[1], "-list") == 0 && argc == 2) {
+        listFunction();
+    } else if (strcmp(argv[1], "-down") == 0 && argc == 3) {
+        downloadFunction(argv[2]);
+    } else {
+        fprintf(stderr, "Invalid command-line options\n");
+    }*/
+
+    return EXIT_SUCCESS;
 }
