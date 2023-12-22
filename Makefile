@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -I./include
-LDFLAGS = -L./lib -lclient -lserver -Wl,-rpath=./lib
+LDFLAGS = -L./lib -lclient -lserver -lcrypto -lssl -Wl,-rpath=./lib
 
 # Directories
 SRC_DIR = src
