@@ -1,9 +1,6 @@
 #include <stdio.h>
-<<<<<<< HEAD
 #include <stdlib.h>
-=======
 #include <sys/socket.h>
->>>>>>> b02a646babb3921820b52d45f9797bbf89fd872f
 #include "../include/server.h"
 
 int main() {
