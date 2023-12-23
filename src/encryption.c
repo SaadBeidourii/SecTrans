@@ -126,6 +126,29 @@ uint64_t desEncryptBlock(uint64_t input, uint64_t* subkeys) {
     return permute(combined,FP, 64);
 }
 
+uint64_t desDecryptBlock(uint64_t input, uint64_t* subkeys) {
+    // Initial permutation
+    uint64_t permutedInput = permute(input, IP, 64);
+
+    // Splitting the input into two halves
+    uint64_t left = permutedInput >> 32;
+    uint64_t right = permutedInput & 0xFFFFFFFF;
+
+    // 16 rounds of DES decryption
+    for (int i = 15; i >= 0; i--) {
+        uint64_t temp = left;
+        left = right ^ f(left, subkeys[i]); // Note the reversal of roles for left and right
+        right = temp;
+    }
+
+    // Combining the two halves
+    uint64_t combined = (right << 32) | left; // Note that right and left are swapped
+
+    // Final permutation
+    return permute(combined, FP, 64);
+}
+
+
 void encrypt(char *input, char *output, char *key){
     uint64_t roundKeys1[16], roundKeys2[16], roundKeys3[16];
 
@@ -137,11 +160,57 @@ void encrypt(char *input, char *output, char *key){
     // Encrypt with first key
     uint64_t temp = desEncryptBlock(input, roundKeys1);
 
-    // Decrypt with second key (using a decryption function, not shown here)
+    // Decrypt with second key 
     temp = desDecryptBlock(temp, roundKeys2);
 
     // Encrypt with third key
     *output = desEncryptBlock(temp, roundKeys3);
+}
+
+
+void decrypt(char *input, char *output, char *key){
+    uint64_t roundKeys1[16], roundKeys2[16], roundKeys3[16];
+
+    // Generate subkeys for all three keys
+    generateSubKeys(key[0], roundKeys1);
+    generateSubKeys(key[1], roundKeys2);
+    generateSubKeys(key[2], roundKeys3);
+
+    // Decrypt with third key
+    uint64_t temp = desDecryptBlock(input, roundKeys3);
+
+    // Encrypt with second key
+    temp = desEncryptBlock(temp, roundKeys2);
+
+    // Decrypt with first key
+    *output = desDecryptBlock(temp, roundKeys1);
+}
+
+int main() {
+    // Test data and key
+    uint64_t input = 0x0123456789ABCDEF; // Example plaintext block
+    uint64_t output;                     // Will hold the encrypted data
+    uint64_t decrypted;                  // Will hold the decrypted data
+    uint64_t keys[3] = {
+        0x133457799BBCDFF1,             // Example key 1
+        0x123456789ABCDEF0,             // Example key 2
+        0xFEDCBA9876543210              // Example key 3
+    };
+
+    // Encrypt the data
+    encrypt(&input, &output, keys);
+
+    // Decrypt the data
+    decrypt(&output, &decrypted, keys);
+
+    // Compare the decrypted data with the original input
+    if (input == decrypted) {
+        printf("Success! The decrypted data matches the original input.\n");
+    } else {
+        printf("Failure! The decrypted data does not match the original input.\n");
+    }
+
+    return 0;
 }
 
 
