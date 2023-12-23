@@ -241,25 +241,47 @@ void decrypt(uint64_t input, uint64_t *output, uint64_t key[3]){
     *output = desDecryptBlock(temp, roundKeys1);
 }
 
-// Main function for testing
+struct TestVector {
+    uint64_t plaintext;
+    uint64_t key[3];
+};
+
 int main() {
-    uint64_t input = 0x0123456789ABCDEF;
-    uint64_t output;
-    uint64_t decrypted;
-    uint64_t keys[3] = {0x133457799BBCDFF1, 0x123456789ABCDEF0, 0xFEDCBA9876543210};
+    // Array of test vectors
+    struct TestVector testVectors[] = {
+        {0x0123456789ABCDEF, {0x133457799BBCDFF1, 0x123456789ABCDEF0, 0xFEDCBA9876543210}}, // Expected ciphertext for 3DES
+        {0x5468617473206D79, {0x1F1F1F1F0E0E0E0E, 0x0123456789ABCDEF, 0x89ABCDEF01234567}}, // Another test vector
+        {0x6B6F6F6C206F6E65, {0x1F1F1F1F0E0E0E0E, 0x0123456789ABCDEF, 0x89ABCDEF01234567}}, // Another test vector
+        {0x3B3898371520F75E, {0x1F1F1F1F0E0E0E0E, 0x0123456789ABCDEF, 0x89ABCDEF01234567}}, // Another test vector
+        {0x3B3898371520F75E, {0x1F1F1F1F0E0E0E0E, 0x0123456789ABCDEF, 0x89ABCDEF01234567}}, // Another test vector
+        {0x3B3898371520F75E, {0x1F1F1F1F0E0E0E0E, 0x0123456789ABCDEF, 0x89ABCDEF01234567}}, // Another test vector
+        {0x3B3898371520F75E, {0x1F1F1F1F0E0E0E0E, 0x0123456789ABCDEF, 0x89ABCDEF01234567}}, // Another test vector
+        {0x3B3898371520F75E, {0x1F1F1F1F0E0E0E0E, 0x0123456789ABCDEF, 0x89ABCDEF01234567}}, // Another test vector
+        {0x3B3898371520F75E, {0x1F1F1F1F0E0E0E0E, 0x0123456789ABCDEF, 0x89ABCDEF01234567}}, // Another test vector
+        
+    };
 
-    encrypt(input, &output, keys);
-    printf("Input: %016llX\n", input);
-    printf("Output: %016llX\n", output);
+    int numTests = sizeof(testVectors) / sizeof(testVectors[0]);
+    int passedTests = 0;
 
-    decrypt(output, &decrypted, keys);
-    printf("Decrypted: %016llX\n", decrypted);
+    for (int i = 0; i < numTests; i++) {
+        uint64_t output, decrypted;
+        encrypt(testVectors[i].plaintext, &output, testVectors[i].key);
+        decrypt(output, &decrypted, testVectors[i].key);
 
-    if (input == decrypted) {
-        printf("Success! The decrypted data matches the original input.\n");
-    } else {
-        printf("Failure! The decrypted data does not match the original input.\n");
+        printf("Test %d:\n", i + 1);
+        printf("Input: %016llX\n", testVectors[i].plaintext);
+        printf("Output: %016llX\n", output);
+        printf("Decrypted: %016llX\n", decrypted);
+
+        if (decrypted == testVectors[i].plaintext) {
+            printf("Success! Encryption and decryption are correct.\n\n");
+            passedTests++;
+        } else {
+            printf("Failure! The output does not match the expected values.\n\n");
+        }
     }
 
+    printf("Passed %d out of %d tests.\n", passedTests, numTests);
     return 0;
 }
