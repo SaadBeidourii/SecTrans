@@ -23,7 +23,7 @@ DBMANAGEMENT_OBJ = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(DBMANAGEMENT_SRC
 # Targets
 all: server client initdb
 
-server: $(SERVER_OBJ)
+server: $(SERVER_OBJ) $(DBMANAGEMENT_OBJ)
 	$(CC) $(CFLAGS) -o $(BIN_DIR)/server $^ $(LDFLAGS)
 
 client: $(CLIENT_OBJ)

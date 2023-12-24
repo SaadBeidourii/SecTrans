@@ -3,14 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/param.h>
 #include "../include/dbmanagement.h"
 
-char white_listed_first_named[10][5] = {"john",  "jane",  "joe",   "jill",
-                                        "jack",  "james", "jenny", "josh",
-                                        "julie", "jim"};
-char white_listed_last_named[10][8] = {
-    "smith",    "doe",   "jones", "jackson", "johnson",
-    "williams", "brown", "davis", "miller",  "wilson"};
+char *white_listed_user_names[] = {"mohamed", "ahmed", "ali", "omar", "khaled"};
 
 char roles[3][10] = {"manager", "employee", "admin"};
 
@@ -91,7 +87,9 @@ int create_file_table(sqlite3 *db) {
               "id INTEGER PRIMARY KEY AUTOINCREMENT,"
               "name TEXT NOT NULL,"
               "path TEXT NOT NULL,"
-              "hash TEXT NOT NULL);";
+              "hash TEXT NOT NULL,"
+              "owner INTEGER NOT NULL,"
+              "FOREIGN KEY(owner) REFERENCES users(id));";
 
   rc = sqlite3_exec(db, sql, NULL, 0, &zErrMsg);
   if (rc != SQLITE_OK) {
@@ -201,11 +199,49 @@ User *get_user_from_table(sqlite3 *db, char *username) {
   if (rc == SQLITE_ROW) {
     user->id = sqlite3_column_int(res, 0);
     user->username = malloc(strlen(sqlite3_column_text(res, 1)) + 1);
-    strcpy(user->username, sqlite3_column_text(res, 1));
+    strncpy(user->username, sqlite3_column_text(res, 1), MIN(strlen(sqlite3_column_text(res, 1)), MAX_STRING_LENGTH));
     user->password = malloc(strlen(sqlite3_column_text(res, 2)) + 1);
-    strcpy(user->password, sqlite3_column_text(res, 2));
+    strncpy(user->password, sqlite3_column_text(res, 2), MIN(strlen(sqlite3_column_text(res, 2)), MAX_STRING_LENGTH));
     user->role = malloc(strlen(sqlite3_column_text(res, 3)) + 1);
-    strcpy(user->role, sqlite3_column_text(res, 3));
+    strncpy(user->role, sqlite3_column_text(res, 3), MIN(strlen(sqlite3_column_text(res, 3)), MAX_STRING_LENGTH));
+  }
+
+  sqlite3_finalize(res);
+  free(sql);
+  return user;
+}
+
+User *get_user_by_id(sqlite3 *db, int id) {
+  char *zErrMsg = 0;
+  int rc;
+  sqlite3_stmt *res;
+
+  char *sql = malloc(104);
+  sprintf(sql, "SELECT * FROM users WHERE id = '%d';", id);
+
+  rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
+  if (rc != SQLITE_OK) {
+    fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
+    sqlite3_free(zErrMsg);
+    free(sql);
+    return NULL;
+  }
+
+  User *user = malloc(sizeof(User));
+  user->id = -1;
+  user->username = NULL;
+  user->password = NULL;
+  user->role = NULL;
+
+  rc = sqlite3_step(res);
+  if (rc == SQLITE_ROW) {
+    user->id = sqlite3_column_int(res, 0);
+    user->username = malloc(strlen(sqlite3_column_text(res, 1)) + 1);
+    strncpy(user->username, sqlite3_column_text(res, 1), MIN(strlen(sqlite3_column_text(res, 1)), MAX_STRING_LENGTH));
+    user->password = malloc(strlen(sqlite3_column_text(res, 2)) + 1);
+    strncpy(user->password, sqlite3_column_text(res, 2), MIN(strlen(sqlite3_column_text(res, 2)), MAX_STRING_LENGTH));
+    user->role = malloc(strlen(sqlite3_column_text(res, 3)) + 1);
+    strncpy(user->role, sqlite3_column_text(res, 3), MIN(strlen(sqlite3_column_text(res, 3)), MAX_STRING_LENGTH));
   }
 
   sqlite3_finalize(res);
@@ -245,11 +281,11 @@ File *get_file_form_table(sqlite3 *db, char filename[]) {
   if (rc == SQLITE_ROW) {
     file->id = sqlite3_column_int(res, 0);
     file->filename = malloc(strlen(sqlite3_column_text(res, 1)) + 1);
-    strcpy(file->filename, sqlite3_column_text(res, 1));
+    strncpy(file->filename, sqlite3_column_text(res, 1), MIN(strlen(sqlite3_column_text(res, 1)), MAX_STRING_LENGTH));
     file->path = malloc(strlen(sqlite3_column_text(res, 2)) + 1);
-    strcpy(file->path, sqlite3_column_text(res, 2));
+    strncpy(file->path, sqlite3_column_text(res, 2), MIN(strlen(sqlite3_column_text(res, 2)), MAX_STRING_LENGTH));
     file->hash = malloc(strlen(sqlite3_column_text(res, 3)) + 1);
-    strcpy(file->hash, sqlite3_column_text(res, 3));
+    strncpy(file->hash, sqlite3_column_text(res, 3), MIN(strlen(sqlite3_column_text(res, 3)), MAX_STRING_LENGTH));
   }
 
   sqlite3_finalize(res);
@@ -262,12 +298,18 @@ File *get_file_form_table(sqlite3 *db, char filename[]) {
  * @param db
  * @return FileList instance or NULL if error
  */
+
+
+/**
+ * @brief get_file_list_from_table
+ * @param db
+ * @return FileList instance or NULL if error
+ */
 int fill_test_data() {
   sqlite3 *db = db_open(DBPATH);
   srand(time(NULL));
 
   if (db == NULL) {
-      printf("l7ma9\n");
     return -1;
   }
 
@@ -276,16 +318,15 @@ int fill_test_data() {
   create_user_table(db);
   create_file_table(db);
 
+  insert_user_into_table(db, "admin", "admin", "admin");
   int i;
   for (i = 0; i < 5; i++) {
     int random = rand() % 2;
     char *username = malloc(20);
     char *password = malloc(20);
     char *role = malloc(20);
-    sprintf(username, "%s%s", white_listed_first_named[i],
-            white_listed_last_named[i]);
-    sprintf(password, "%s%s", white_listed_first_named[i],
-            white_listed_last_named[i]);
+    sprintf(username, "%s", white_listed_user_names[i]);
+    sprintf(password, "%s", white_listed_user_names[i]);
     sprintf(role, "%s", roles[random]);
     insert_user_into_table(db, username, password, role);
     free(username);
