@@ -11,5 +11,4 @@ RUN make
 
 EXPOSE 4000
 
-CMD bin/initdb
-CMD bin/server
+CMD ["sh", "-c", "./bin/initdb && ./bin/server"]

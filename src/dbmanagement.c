@@ -306,7 +306,6 @@ File *get_file_form_table(sqlite3 *db, char filename[]) {
  * @return FileList instance or NULL if error
  */
 int fill_test_data() {
-	printf("got here\n");
   sqlite3 *db = db_open(DBPATH);
   srand(time(NULL));
 
