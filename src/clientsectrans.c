@@ -34,7 +34,7 @@ void sha256(const char *input, char outputBuffer[65]) {
 int main(){
     char outputBuffer[65];
     sha256("Hello World!", outputBuffer);
-    printf("%d\n", sndmsg("Hello World!", 3000));
-    printf("%d\n", sndmsg(outputBuffer, 3000));
+    printf("%d\n", sndmsg("Hello World!", 4000));
+    printf("%d\n", sndmsg(outputBuffer, 4000));
     return 0;
 }
