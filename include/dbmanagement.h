@@ -12,8 +12,7 @@
 typedef struct {
   int id;
   char *username;
-  char *password;
-  char *role;
+  char *password; char *role;
 } User;
 
 typedef struct {
@@ -24,7 +23,18 @@ typedef struct {
   int owner;
 } File;
 
-sqlite3 *db_open(char *db_name);
+typedef struct {
+  File *files;
+  int size;
+} FileList;
+
+typedef struct {
+  char **fileTitles;
+  int size;
+} TitleList;
+
+sqlite3 *
+db_open(char *db_name);
 void db_close(sqlite3 *db);
 int create_user_table(sqlite3 *db);
 int create_file_table(sqlite3 *db);
@@ -37,5 +47,6 @@ User *get_user_by_id(sqlite3 *db, int id);
 File *get_file_form_table(sqlite3 *db, char filename[]);
 
 int fill_test_data();
+TitleList *get_file_list_from_table(sqlite3 *db);
 
 #endif

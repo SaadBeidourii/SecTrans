@@ -8,11 +8,16 @@
  */
 int main(){
     User *user;
+    TitleList *eltitro;
     sqlite3 *db = db_open(DBPATH);
-    user = get_user_by_id(db, 1);
-    printf("User: %s\n", user->username);
-    user = get_user_from_table(db, "ahmed");
-    printf("User: %d\n", user->id);
+
+    eltitro = get_file_list_from_table(db);
+    for(int i = 1; i<=7; i++){
+	    user = get_user_by_id(db,i);
+	    printf("User: %s\n", user->username);
+//	    printf("title: %s\n", eltitro->fileTitles[i]);
+    }
+
     if(startserver(3000) == 0){
         printf("Server started successfully!\n");
         while(1){

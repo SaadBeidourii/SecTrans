@@ -1,12 +1,13 @@
+#include "../include/dbmanagement.h"
 #include <sqlite3.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <sys/param.h>
-#include "../include/dbmanagement.h"
+#include <time.h>
 
-char *white_listed_user_names[] = {"mohamed", "ahmed", "ali", "omar", "khaled"};
+char *white_listed_user_names[] = {"mohamed", "ahmed",  "ali",
+                                   "omar",    "khaled", "abdellah"};
 
 char roles[3][10] = {"manager", "employee", "admin"};
 
@@ -23,17 +24,17 @@ sqlite3 *db_open(char *db_name) {
   rc = sqlite3_open(db_name, &db);
   if (rc) {
     fprintf(stderr, "Can't open database: %s\n", sqlite3_errmsg(db));
-        switch(rc) {
-            case SQLITE_ERROR:
-                fprintf(stderr, "SQLITE_ERROR: Generic error\n");
-                break;
-            case SQLITE_INTERNAL:
-                fprintf(stderr, "SQLITE_INTERNAL: Internal logic error in SQLite\n");
-                break;
-            // Add more cases for other potential error codes
-            default:
-                fprintf(stderr, "Unknown error code: %d\n", rc);
-        }
+    switch (rc) {
+    case SQLITE_ERROR:
+      fprintf(stderr, "SQLITE_ERROR: Generic error\n");
+      break;
+    case SQLITE_INTERNAL:
+      fprintf(stderr, "SQLITE_INTERNAL: Internal logic error in SQLite\n");
+      break;
+    // Add more cases for other potential error codes
+    default:
+      fprintf(stderr, "Unknown error code: %d\n", rc);
+    }
     return NULL;
   } else {
     fprintf(stderr, "Opened database successfully\n");
@@ -115,23 +116,41 @@ int insert_user_into_table(sqlite3 *db, char *username, char *password,
   char *zErrMsg = 0;
   int rc;
 
+  /*
   char *sql = malloc(strlen(username) + strlen(password) + 100);
   sprintf(
       sql,
       "INSERT INTO users (username, password, role) VALUES ('%s', '%s', '%s');",
       username, password, role);
+ */
 
-  rc = sqlite3_exec(db, sql, NULL, 0, &zErrMsg);
+  char sql[] = "INSERT INTO users (username, password, role) VALUES (?, ?, ?);";
+  sqlite3_stmt *stmt;
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+
   if (rc != SQLITE_OK) {
-    fprintf(stderr, "SQL error: %s\n", zErrMsg);
+    fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
     sqlite3_free(zErrMsg);
-    free(sql);
     return -1;
-  } else {
-    fprintf(stdout, "User inserted successfully\n");
-    free(sql);
-    return 0;
   }
+
+  sqlite3_bind_text(stmt, 1, username, MIN(strlen(username), MAX_STRING_LENGTH),
+                    SQLITE_STATIC);
+  sqlite3_bind_text(stmt, 2, password, MIN(strlen(password), MAX_STRING_LENGTH),
+                    SQLITE_STATIC);
+  sqlite3_bind_text(stmt, 3, role, MIN(strlen(role), MAX_STRING_LENGTH),
+                    SQLITE_STATIC);
+
+  rc = sqlite3_step(stmt);
+
+  if (rc != SQLITE_DONE) {
+    fprintf(stderr, "Execution failed: %s\n", sqlite3_errmsg(db));
+    return rc;
+  }
+  printf("Inserted User\n");
+  sqlite3_finalize(stmt);
+
+  return 0;
 }
 
 /**
@@ -148,23 +167,44 @@ int insert_file_into_table(sqlite3 *db, char *name, char *path, char *hash,
   char *zErrMsg = 0;
   int rc;
 
+  /*
   char *sql = malloc(strlen(name) + strlen(path) + strlen(hash) + 100);
   sprintf(sql,
           "INSERT INTO files (name, path, hash, owner) VALUES ('%s', '%s', "
           "'%s', %d);",
           name, path, hash, owner);
+  */
+  char sql[] =
+      "INSERT INTO files (name, path, hash, owner) VALUES (?, ?, ?, ?)";
 
-  rc = sqlite3_exec(db, sql, NULL, 0, &zErrMsg);
+  sqlite3_stmt *stmt;
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+
   if (rc != SQLITE_OK) {
-    fprintf(stderr, "SQL error: %s\n", zErrMsg);
+    fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
     sqlite3_free(zErrMsg);
-    free(sql);
     return -1;
-  } else {
-    fprintf(stdout, "File inserted successfully\n");
-    free(sql);
-    return 0;
   }
+
+  sqlite3_bind_text(stmt, 1, name, MIN(strlen(name), MAX_STRING_LENGTH),
+                    SQLITE_STATIC);
+  sqlite3_bind_text(stmt, 2, path, MIN(strlen(path), MAX_STRING_LENGTH),
+                    SQLITE_STATIC);
+  sqlite3_bind_text(stmt, 3, hash, MIN(strlen(hash), MAX_STRING_LENGTH),
+                    SQLITE_STATIC);
+  sqlite3_bind_int(stmt, 4, owner);
+
+  rc = sqlite3_step(stmt);
+
+  if (rc != SQLITE_DONE) {
+    fprintf(stderr, "Execution failed: %s\n", sqlite3_errmsg(db));
+    return rc;
+  }
+
+  sqlite3_finalize(stmt);
+  printf("inserted file\n");
+
+  return 0;
 }
 
 /**
@@ -196,17 +236,21 @@ User *get_user_from_table(sqlite3 *db, char *username) {
   user->role = NULL;
 
   rc = sqlite3_step(res);
+  sqlite3_finalize(res);
+
   if (rc == SQLITE_ROW) {
     user->id = sqlite3_column_int(res, 0);
     user->username = malloc(strlen(sqlite3_column_text(res, 1)) + 1);
-    strncpy(user->username, sqlite3_column_text(res, 1), MIN(strlen(sqlite3_column_text(res, 1)), MAX_STRING_LENGTH));
+    strncpy(user->username, sqlite3_column_text(res, 1),
+            MIN(strlen(sqlite3_column_text(res, 1)), MAX_STRING_LENGTH));
     user->password = malloc(strlen(sqlite3_column_text(res, 2)) + 1);
-    strncpy(user->password, sqlite3_column_text(res, 2), MIN(strlen(sqlite3_column_text(res, 2)), MAX_STRING_LENGTH));
+    strncpy(user->password, sqlite3_column_text(res, 2),
+            MIN(strlen(sqlite3_column_text(res, 2)), MAX_STRING_LENGTH));
     user->role = malloc(strlen(sqlite3_column_text(res, 3)) + 1);
-    strncpy(user->role, sqlite3_column_text(res, 3), MIN(strlen(sqlite3_column_text(res, 3)), MAX_STRING_LENGTH));
+    strncpy(user->role, sqlite3_column_text(res, 3),
+            MIN(strlen(sqlite3_column_text(res, 3)), MAX_STRING_LENGTH));
   }
 
-  sqlite3_finalize(res);
   free(sql);
   return user;
 }
@@ -237,11 +281,14 @@ User *get_user_by_id(sqlite3 *db, int id) {
   if (rc == SQLITE_ROW) {
     user->id = sqlite3_column_int(res, 0);
     user->username = malloc(strlen(sqlite3_column_text(res, 1)) + 1);
-    strncpy(user->username, sqlite3_column_text(res, 1), MIN(strlen(sqlite3_column_text(res, 1)), MAX_STRING_LENGTH));
+    strncpy(user->username, sqlite3_column_text(res, 1),
+            MIN(strlen(sqlite3_column_text(res, 1)) + 1, MAX_STRING_LENGTH));
     user->password = malloc(strlen(sqlite3_column_text(res, 2)) + 1);
-    strncpy(user->password, sqlite3_column_text(res, 2), MIN(strlen(sqlite3_column_text(res, 2)), MAX_STRING_LENGTH));
+    strncpy(user->password, sqlite3_column_text(res, 2),
+            MIN(strlen(sqlite3_column_text(res, 2)) + 1, MAX_STRING_LENGTH));
     user->role = malloc(strlen(sqlite3_column_text(res, 3)) + 1);
-    strncpy(user->role, sqlite3_column_text(res, 3), MIN(strlen(sqlite3_column_text(res, 3)), MAX_STRING_LENGTH));
+    strncpy(user->role, sqlite3_column_text(res, 3),
+            MIN(strlen(sqlite3_column_text(res, 3)) + 1, MAX_STRING_LENGTH));
   }
 
   sqlite3_finalize(res);
@@ -250,24 +297,26 @@ User *get_user_by_id(sqlite3 *db, int id) {
 }
 
 /**
- * @brief get_file_form_table
+ * @brief get_file_from_table
  * @param db
  * @param filename
  * @return File instance or NULL if error
  */
-File *get_file_form_table(sqlite3 *db, char filename[]) {
+File *get_file_from_table(sqlite3 *db, char filename[]) {
   char *zErrMsg = 0;
   int rc;
   sqlite3_stmt *res;
 
+  /*
   char *sql = malloc(strlen(filename) + 100);
   sprintf(sql, "SELECT * FROM files WHERE name = '%s';", filename);
+  */
+  char sql[] = "SELECT * FROM files WHERE name = ?";
 
   rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
   if (rc != SQLITE_OK) {
     fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
     sqlite3_free(zErrMsg);
-    free(sql);
     return NULL;
   }
 
@@ -281,31 +330,122 @@ File *get_file_form_table(sqlite3 *db, char filename[]) {
   if (rc == SQLITE_ROW) {
     file->id = sqlite3_column_int(res, 0);
     file->filename = malloc(strlen(sqlite3_column_text(res, 1)) + 1);
-    strncpy(file->filename, sqlite3_column_text(res, 1), MIN(strlen(sqlite3_column_text(res, 1)), MAX_STRING_LENGTH));
+    strncpy(file->filename, sqlite3_column_text(res, 1),
+            MIN(strlen(sqlite3_column_text(res, 1)) + 1, MAX_STRING_LENGTH));
     file->path = malloc(strlen(sqlite3_column_text(res, 2)) + 1);
-    strncpy(file->path, sqlite3_column_text(res, 2), MIN(strlen(sqlite3_column_text(res, 2)), MAX_STRING_LENGTH));
+    strncpy(file->path, sqlite3_column_text(res, 2),
+            MIN(strlen(sqlite3_column_text(res, 2)) + 1, MAX_STRING_LENGTH));
     file->hash = malloc(strlen(sqlite3_column_text(res, 3)) + 1);
-    strncpy(file->hash, sqlite3_column_text(res, 3), MIN(strlen(sqlite3_column_text(res, 3)), MAX_STRING_LENGTH));
+    strncpy(file->hash, sqlite3_column_text(res, 3),
+            MIN(strlen(sqlite3_column_text(res, 3)) + 1, MAX_STRING_LENGTH));
   }
 
   sqlite3_finalize(res);
-  free(sql);
   return file;
 }
 
 /**
  * @brief get_file_list_from_table
  * @param db
- * @return FileList instance or NULL if error
+ * @return TitleList instance or NULL if error
  */
+TitleList *get_file_list_from_table(sqlite3 *db) {
+  // get the files from the database
+  // allocate memory for the list
+  // fill the list with the files
+  TitleList *titleList = NULL;
+  sqlite3_stmt *stmt;
+  const char *countSql =
+      "SELECT COUNT(*) FROM files"; // Replace with your actual table name
+  const char *selectSql =
+      "SELECT name FROM files"; // Replace with your actual table name
+  int rc;
 
+  // Prepare the statement to get the count of titles
+  rc = sqlite3_prepare_v2(db, countSql, -1, &stmt, NULL);
+  if (rc != SQLITE_OK) {
+    fprintf(stderr, "Cannot prepare count statement: %s\n", sqlite3_errmsg(db));
+    return NULL;
+  }
+
+  // Execute the count statement
+  rc = sqlite3_step(stmt);
+  if (rc != SQLITE_ROW) {
+    fprintf(stderr, "Execution failed: %s\n", sqlite3_errmsg(db));
+    sqlite3_finalize(stmt);
+    return NULL;
+  }
+
+  // Get the count of titles
+  int titleCount = sqlite3_column_int(stmt, 0);
+
+  // Finalize the count statement
+  sqlite3_finalize(stmt);
+
+  // Allocate memory for titleList
+  titleList = (TitleList *)malloc(sizeof(TitleList));
+  if (titleList == NULL) {
+    fprintf(stderr, "Memory allocation error\n");
+    return NULL;
+  }
+
+  // Initialize titleList
+  titleList->fileTitles = (char **)malloc(titleCount * sizeof(char *));
+  if (titleList->fileTitles == NULL) {
+    fprintf(stderr, "Memory allocation error\n");
+    free(titleList);
+    return NULL;
+  }
+  titleList->size = titleCount;
+
+  // Prepare the statement to get the titles
+  rc = sqlite3_prepare_v2(db, selectSql, -1, &stmt, NULL);
+  if (rc != SQLITE_OK) {
+    fprintf(stderr, "Cannot prepare select statement: %s\n",
+            sqlite3_errmsg(db));
+    free(titleList->fileTitles);
+    free(titleList);
+    return NULL;
+  }
+
+  printf("titleCount: %d\n", titleCount);
+  // Fetch data and fill the titleList
+  for (int i = 0; (i < (titleCount)+1) && (rc = sqlite3_step(stmt)) == SQLITE_ROW;
+       ++i) {
+    const char *title = (const char *)sqlite3_column_text(stmt, 0);
+
+    printf("%s\n", title);
+    // Allocate memory for the title
+    titleList->fileTitles[i] = strdup(title);
+    if (titleList->fileTitles[i] == NULL) {
+      fprintf(stderr, "Memory allocation error\n");
+      free(titleList->fileTitles);
+      free(titleList);
+      sqlite3_finalize(stmt);
+      return NULL;
+    }
+  }
+
+  // Check if there was an error or if the loop ended successfully
+  if (rc != SQLITE_DONE) {
+    fprintf(stderr, "Execution failed: %s\n", sqlite3_errmsg(db));
+    free(titleList->fileTitles);
+    free(titleList);
+    sqlite3_finalize(stmt);
+    return NULL;
+  }
+
+  // Finalize the statement
+  sqlite3_finalize(stmt);
+
+  return titleList; // return the list
+}
 
 /**
- * @brief get_file_list_from_table
- * @param db
- * @return FileList instance or NULL if error
+ * @brief fill in test data
  */
 int fill_test_data() {
+  printf("FILLING TEST DATA!\n");
   sqlite3 *db = db_open(DBPATH);
   srand(time(NULL));
 
@@ -319,8 +459,9 @@ int fill_test_data() {
   create_file_table(db);
 
   insert_user_into_table(db, "admin", "admin", "admin");
+  insert_file_into_table(db, "el filo", "el ziko", "el pico", 1);
   int i;
-  for (i = 0; i < 5; i++) {
+  for (i = 0; i < 6; i++) {
     int random = rand() % 2;
     char *username = malloc(20);
     char *password = malloc(20);
@@ -329,6 +470,7 @@ int fill_test_data() {
     sprintf(password, "%s", white_listed_user_names[i]);
     sprintf(role, "%s", roles[random]);
     insert_user_into_table(db, username, password, role);
+    insert_file_into_table(db, "el filo", "el ziko", "el pico", i+1);
     free(username);
     free(password);
     free(role);
@@ -336,4 +478,3 @@ int fill_test_data() {
   db_close(db);
   return 0;
 }
-
