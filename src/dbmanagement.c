@@ -390,7 +390,7 @@ TitleList *get_file_list_from_table(sqlite3 *db) {
   }
 
   // Initialize titleList
-  titleList->fileTitles = (char **)malloc(titleCount * sizeof(char *));
+  titleList->fileTitles = (char **)malloc((titleCount) * sizeof(char *));
   if (titleList->fileTitles == NULL) {
     fprintf(stderr, "Memory allocation error\n");
     free(titleList);
@@ -414,7 +414,7 @@ TitleList *get_file_list_from_table(sqlite3 *db) {
        ++i) {
     const char *title = (const char *)sqlite3_column_text(stmt, 0);
 
-    printf("%s\n", title);
+    printf("the index is %d and i am inserting %s\n", i, title);
     // Allocate memory for the title
     titleList->fileTitles[i] = strdup(title);
     if (titleList->fileTitles[i] == NULL) {

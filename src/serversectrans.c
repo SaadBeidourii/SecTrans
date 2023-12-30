@@ -15,7 +15,7 @@ int main(){
     for(int i = 1; i<=7; i++){
 	    user = get_user_by_id(db,i);
 	    printf("User: %s\n", user->username);
-//	    printf("title: %s\n", eltitro->fileTitles[i]);
+	    printf("title: %s\n", eltitro->fileTitles[i-1]);
     }
 
     if(startserver(3000) == 0){
