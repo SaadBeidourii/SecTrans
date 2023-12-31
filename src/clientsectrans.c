@@ -31,10 +31,23 @@ void sha256(const char *input, char outputBuffer[65]) {
     outputBuffer[64] = '\0';
 }
 
-int main(){
-    char outputBuffer[65];
-    sha256("Hello World!", outputBuffer);
-    printf("%d\n", sndmsg("Hello World!", 4000));
-    printf("%d\n", sndmsg(outputBuffer, 4000));
-    return 0;
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "very few arguments\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    // Process command-line options
+    if (strcmp(argv[1], "-up") == 0 && argc == 3) {
+        sndmsg(argv[2],4000);
+        printf("ratsift\n");
+    } /*else if (strcmp(argv[1], "-list") == 0 && argc == 2) {
+        listFunction();
+    } else if (strcmp(argv[1], "-down") == 0 && argc == 3) {
+        downloadFunction(argv[2]);
+    }*/ else {
+        fprintf(stderr, "Invalid command-line options\n");
+    }
+
+    return EXIT_SUCCESS;
 }
