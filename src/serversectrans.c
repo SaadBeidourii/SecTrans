@@ -1,30 +1,30 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <sys/socket.h>
 #include "../include/server.h"
+#include "../include/dbmanagement.h"
+#include <sqlite3.h>
 
-int main() {
-    char* messages[200];
-    int i = 0;
+/**
+ * the main function of our application server
+ */
+int main(){
+    User *user;
+    TitleList *eltitro;
+    sqlite3 *db = db_open(DBPATH);
 
-    if (startserver(3000) == 0) {
+    eltitro = get_file_list_from_table(db);
+    for(int i = 1; i<=7; i++){
+	    user = get_user_by_id(db,i);
+	    printf("User: %s\n", user->username);
+	    printf("title: %s\n", eltitro->fileTitles[i-1]);
+    }
+
+    if(startserver(3000) == 0){
         printf("Server started successfully!\n");
-        while (1) {
-            char* message = malloc(1024);  // Allocate memory for the message
-            if (getmsg(message) == 0) {
-                free(message);
-                break;  // Handle error or exit loop when no more messages
-            }
-            messages[i] = message;
-            i++;
+        while(1){
+            char message[1024];
+            printf("%d\n", getmsg(message));
             printf("Received message: %s\n", message);
         }
     }
-
-    // Free dynamically allocated memory
-    for (int j = 0; j < i; j++) {
-        free(messages[j]);
-    }
-
     return 0;
 }

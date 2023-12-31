@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
 
     // Process command-line options
     if (strcmp(argv[1], "-up") == 0 && argc == 3) {
-        sndmsg(argv[2],3000);
+        sndmsg(argv[2],4000);
         printf("ratsift\n");
     } /*else if (strcmp(argv[1], "-list") == 0 && argc == 2) {
         listFunction();
