@@ -1,4 +1,4 @@
-# SecTrans for MacoHard
+# SecTrans for MacroHard
 
 # how do i compile ?
 ```
