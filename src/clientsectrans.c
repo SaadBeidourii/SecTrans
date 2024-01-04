@@ -52,7 +52,7 @@ const char *getFileName(const char *path) {
 int send_file(char *filePath) {
   char firstMessage[1024] = "up ";
   strncat(firstMessage, getFileName(filePath), MIN(99, strlen(filePath)));
-  sndmsg(firstMessage, 4000);
+  //sndmsg(firstMessage, 3000);
   char buffer[1024];
   int size = 0;
   // open the file
@@ -74,7 +74,7 @@ int send_file(char *filePath) {
 
   do {
     size = read(fd, buffer, 1024);
-    sndmsg(buffer, 4000);
+    sndmsg(buffer, 3000);
     write(1, buffer, size);
   } while (size > 0);
 
