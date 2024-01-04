@@ -76,6 +76,8 @@ int send_file(char *filePath) {
     size = read(fd, buffer, 1024);
     sndmsg(buffer, 4000);
     write(1, buffer, size);
+    sleep(2);
+    memset(buffer, 0, 1024);
   } while (size > 0);
 
   return 0;

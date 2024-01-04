@@ -410,8 +410,8 @@ TitleList *get_file_list_from_table(sqlite3 *db) {
 
   printf("titleCount: %d\n", titleCount);
   // Fetch data and fill the titleList
-  for (int i = 0; (i < (titleCount)+1) && (rc = sqlite3_step(stmt)) == SQLITE_ROW;
-       ++i) {
+  for (int i = 0;
+       (i < (titleCount) + 1) && (rc = sqlite3_step(stmt)) == SQLITE_ROW; ++i) {
     const char *title = (const char *)sqlite3_column_text(stmt, 0);
 
     printf("the index is %d and i am inserting %s\n", i, title);
@@ -470,7 +470,7 @@ int fill_test_data() {
     sprintf(password, "%s", white_listed_user_names[i]);
     sprintf(role, "%s", roles[random]);
     insert_user_into_table(db, username, password, role);
-    insert_file_into_table(db, "el filo", "el ziko", "el pico", i+1);
+    insert_file_into_table(db, "el filo", "el ziko", "el pico", i + 1);
     free(username);
     free(password);
     free(role);
