@@ -72,10 +72,10 @@ void recieveFile(char *fileName) {
   printf("%s\n", message);
   printf("%d\n", atoi(message));
   int fileSize = atoi(message);
-  for(int i = 0; (i)*1024 < fileSize; i++) {
+  for (int i = 0; (i) * 1024 < fileSize; i++) {
     getmsg(message);
     strncat(fileContent, message, 1024);
-    printf("recieved message: %s\n", message);
+    printf("%s\n", message);
     memset(message, 0, sizeof(message));
   }
   printf("file recieved\n");
@@ -88,17 +88,25 @@ void recieveFile(char *fileName) {
  */
 int main() {
   char firstMessage[2][1024];
+  sqlite3 *db = db_open(DBPATH);
   if (startserver(3000) == 0) {
     printf("Server started successfully!\n");
     while (1) {
       char message[1024];
       getmsg(message);
-      //      printf("%s\n", message);
       splitString(message, firstMessage[0], firstMessage[1]);
-      if (memcmp(firstMessage[0], "up", 3) == 0) {
-        recieveFile(firstMessage[1]);
+      printf("%s\n", firstMessage[0]);
+      User *user = malloc(sizeof(User));
+      user = get_user_from_table(db, firstMessage[0]);
+      if (user != NULL && strcmp(user->password, firstMessage[1]) == 0) {
+        printf("we in the if muthafucka\n");
+        getmsg(message);
+        splitString(message, firstMessage[0], firstMessage[1]);
+        if (memcmp(firstMessage[0], "up", 3) == 0) {
+          recieveFile(firstMessage[1]);
+        }
+        memset(message, 0, sizeof(message));
       }
-      memset(message, 0, sizeof(message));
     }
   }
   return 0;

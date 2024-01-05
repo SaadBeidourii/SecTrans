@@ -11,6 +11,7 @@
 
 #define MAX_FILE_SIZE 10485760
 #define DOCKER_SERVER_PORT_NUMBER 3000
+#define BUFFER_SIZE 1024
 
 /**
  * Calculates the SHA-256 hash of a string.
@@ -46,6 +47,23 @@ void sha256(const char *input, char outputBuffer[65]) {
 }
 
 /**
+ * Authenticates the user.
+ */
+void authenticate(){
+	printf("Enter your username: ");
+	char username[100];
+	scanf("%s", username);
+	printf("Enter your password: ");
+	char password[100];
+	scanf("%s", password);
+	char message[1024];
+	strcpy(message, username);
+	strcat(message, " ");
+	strcat(message, password);
+	sndmsg(message, DOCKER_SERVER_PORT_NUMBER);
+}
+
+/**
  * Returns the file name from a path.
  *
  * @param path The path to the file.
@@ -65,6 +83,47 @@ const char *getFileName(const char *path) {
   return lastSlash + 1;
 }
 
+int readFile(int fd, char **buffer, size_t *size) {
+    // Initialize buffer and size
+    *buffer = NULL;
+    *size = 0;
+
+    // Temporary buffer to read file contents in chunks
+    char tempBuffer[BUFFER_SIZE];
+    ssize_t bytesRead;
+
+    // Loop to read the file in chunks
+    while ((bytesRead = read(fd, tempBuffer, sizeof(tempBuffer))) > 0 && bytesRead <= MAX_FILE_SIZE) {
+        // Resize the buffer to accommodate the new data
+        *buffer = realloc(*buffer, *size + bytesRead);
+
+        // Check if realloc was successful
+        if (*buffer == NULL) {
+            perror("Error reallocating buffer");
+            return -1;
+        }
+
+        // Copy the new data to the end of the buffer
+        memcpy(*buffer + *size, tempBuffer, bytesRead);
+
+        // Update the size
+        *size += bytesRead;
+    }
+
+    // Check for read errors
+    if (bytesRead < 0) {
+        perror("Error reading file");
+        return -1;
+    }
+
+    if(bytesRead > MAX_FILE_SIZE) {
+	printf("File size is too big\n");
+	return -1;
+    }
+
+    return 0; // Success
+}
+
 /**
  * Sends a file to the server.
  *
@@ -73,11 +132,11 @@ const char *getFileName(const char *path) {
  * @return 0 on success, 1 on failure.
  */
 int send_file(char *filePath) {
-  char *fileContent = (char *)malloc(MAX_FILE_SIZE * sizeof(char));
+  char *fileContent;
   char firstMessage[1024] = "up ";
   char hash[65];
   char buffer[1024];
-  int size = 0;
+  size_t size = 0;
   //
   // open the file
   int fd;
@@ -99,6 +158,7 @@ int send_file(char *filePath) {
     exit(1);
   }
 
+  /*
   int counter = 0;
   do {
     counter++;
@@ -108,21 +168,24 @@ int send_file(char *filePath) {
     // write(1, buffer, size);
     memset(buffer, 0, 1024);
   } while (size > 0 && counter <= 1024);
+  */
+  readFile(fd, &fileContent, &size);
 
-  if (size > 0) {
-    printf("maximum size is 10Mib\n");
-    free(fileContent);
-    return -1;
-  }
+  //close the file
+  close(fd);
+
+  authenticate();
 
   strncat(firstMessage, getFileName(filePath), MIN(99, strlen(filePath)));
   strcat(firstMessage, " ");
   sha256(fileContent, hash);
   strcat(firstMessage, hash);
   sndmsg(firstMessage, DOCKER_SERVER_PORT_NUMBER);
-  sprintf(buffer, "%d", (int)strlen(fileContent));
+  memset(buffer, 0, BUFFER_SIZE);
+  sprintf(buffer, "%ld", sizeof(fileContent));
+  printf("size of file %d\n", (int)sizeof(fileContent));
   sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
-  for (int i = 0; i < counter - 1; i++) {
+  for (int i = 0; i < (size/BUFFER_SIZE) - 1; i++) {
     memset(buffer, 0, 1024);
     memcpy(buffer, fileContent + (i * 1024), 1024);
     printf("%s\n", buffer);
@@ -136,7 +199,7 @@ int send_file(char *filePath) {
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
-    fprintf(stderr, "very few arguments\n", argv[0]);
+    fprintf(stderr, "very few arguments %s\n", argv[0]);
     return EXIT_FAILURE;
   }
 
