@@ -3,6 +3,7 @@
 
 #include <sqlite3.h>
 
+
 #define DBNAME "db.sqlite3"
 #define DBPATH "./db.sqlite3"
 #define USER_TABLE "users"

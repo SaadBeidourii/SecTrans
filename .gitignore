@@ -2,3 +2,5 @@ obj/
 bin/
 lib/*.so.*
 .vscode/
+db.sqlite3
+files/

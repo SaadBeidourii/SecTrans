@@ -1,10 +1,21 @@
-# SecTrans for MacoHard
+# SecTrans for MacroHard
 
-# how do i compile ?
+# How to run ?
 ``` bash
 mkdir obj
 mkdir bin
-make
+```
+## run server:
+``` bash
+docker build -t sectrans .
+docker run -p 4000:3000 -it sectrans
+```
+> hint, you may need sudo depending on your system and your rights
+
+## run client:
+```bash
+make client
+./bin/client -up {path to your file}
 ```
 
 # how is this supposed to work and what makes it secure ?
