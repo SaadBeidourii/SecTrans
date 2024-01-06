@@ -1,4 +1,5 @@
 #include "../include/client.h"
+#include "../include/server.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <openssl/evp.h>
@@ -277,7 +278,7 @@ int send_file(char *filePath) {
     }
     printf("\n");
     sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
-     sleep(1);
+     //sleep(1);
   }
 
   printf("file sent\n");
@@ -290,6 +291,24 @@ int send_file(char *filePath) {
   return 0;
 }
 
+int getFileList() {
+  char buffer[1024] = "list ";
+  char portBuffer[5];
+  authenticate();
+  int i = 0;
+  do{
+	  i++;
+  }while(startserver(DOCKER_SERVER_PORT_NUMBER + i) != 0);
+  sprintf(portBuffer, "%d", DOCKER_SERVER_PORT_NUMBER + i);
+  strcat(buffer, portBuffer); 
+  sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
+  memset(buffer, 0, 1024);
+  getmsg(buffer);
+  printf("%s\n", buffer);
+  stopserver();
+  return 0;
+}
+
 int main(int argc, char *argv[]) {
   if (argc < 2) {
     fprintf(stderr, "very few arguments %s\n", argv[0]);
@@ -299,9 +318,9 @@ int main(int argc, char *argv[]) {
   // Process command-line options
   if (strcmp(argv[1], "-up") == 0 && argc == 3) {
     send_file(argv[2]);
-  } /*else if (strcmp(argv[1], "-list") == 0 && argc == 2) {
-      listFunction();
-  } else if (strcmp(argv[1], "-down") == 0 && argc == 3) {
+  } else if (strcmp(argv[1], "-list") == 0 && argc == 2) {
+      getFileList();
+  }/* else if (strcmp(argv[1], "-down") == 0 && argc == 3) {
       downloadFunction(argv[2]);
   }*/
   else {

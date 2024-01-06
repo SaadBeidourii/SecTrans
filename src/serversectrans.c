@@ -1,3 +1,4 @@
+#include "../include/client.h"
 #include "../include/dbmanagement.h"
 #include "../include/server.h"
 #include <fcntl.h>
@@ -142,6 +143,7 @@ void createAndWriteToFile(const char *fileName, const char *fileContent,
   printf("File %s created and written successfully.\n", fullPath);
 }
 
+/*
 // Function to split a string into two tokens based on spaces
 void splitString(const char *input, char token1[1024], char token2[1024]) {
   // Use strtok to get the first token
@@ -163,7 +165,44 @@ void splitString(const char *input, char token1[1024], char token2[1024]) {
     token2[0] = '\0';
   }
 }
+*/
 
+void splitString(const char *input, char token1[1024], char token2[1024],
+                 char token3[1024]) {
+  memset(token1, 0, 1024);
+  memset(token2, 0, 1024);
+  memset(token3, 0, 1024);
+  // Use strtok to get the first token
+  char *firstToken = strtok((char *)input, " ");
+  if (firstToken != NULL) {
+    strcpy(token1, firstToken);
+
+    // Use strtok to get the second token
+    char *secondToken = strtok(NULL, " ");
+    if (secondToken != NULL) {
+      strcpy(token2, secondToken);
+
+      // Use strtok to get the third token
+      char *thirdToken = strtok(NULL, " ");
+      if (thirdToken != NULL) {
+        strcpy(token3, thirdToken);
+      } else {
+        // If there's no third token, set the third token to an empty string
+        token3[0] = '\0';
+      }
+    } else {
+      // If there's no second token, set both the second and third tokens to an
+      // empty string
+      token2[0] = '\0';
+      token3[0] = '\0';
+    }
+  } else {
+    // If there's no first token, set all tokens to an empty string
+    token1[0] = '\0';
+    token2[0] = '\0';
+    token3[0] = '\0';
+  }
+}
 /*
 ⠀⢸⠂⠀⠀⠀⠘⣧⠀⠀⣟⠛⠲⢤⡀⠀⠀⣰⠏⠀⠀⠀⠀⠀⢹⡀
 ⠀⡿⠀⠀⠀⠀⠀⠈⢷⡀⢻⡀⠀⠀⠙⢦⣰⠏⠀⠀⠀⠀⠀⠀⢸⠀
@@ -184,7 +223,7 @@ void splitString(const char *input, char token1[1024], char token2[1024]) {
 ⠀⠀⠀⠀⠀⠀⠀⠀⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡆⠀⠀⠀⠀⠀
 */
 
-void recieveFile(char *fileName) {
+void recieveFile(char *fileName, char *hash, User user) {
   int counter = 0;
   printf("currently recieving file %s\n", fileName);
   char *fileContent = (char *)malloc(MAX_FILE_SIZE * sizeof(char));
@@ -233,14 +272,34 @@ void recieveFile(char *fileName) {
       base64_decode(fileContent, fileSize, &decodedSize);
 
   createAndWriteToFile(fileName, decodedFile, decodedSize);
+  sqlite3 *db = db_open(DBPATH);
+  char path[100] = "./files/";
+  strcat(path, fileName);
+  insert_file_into_table(db, fileName, path, hash, user.id);
+  db_close(db);
+}
+
+void getFileList(char *port, User *user) {
+  char buffer[1024];
+  memset(buffer, 0, 1024);
+  sqlite3 *db = db_open(DBPATH);
+  TitleList *titles = query_files_for_user(db, *user);
+  for (int i = 0; i < titles->size; i++) {
+    printf("%s\n", titles->fileTitles[i]);
+    strcat(buffer, titles->fileTitles[i]);
+    strcat(buffer, "\n");
+  }
+  db_close(db);
+  free_title_list(titles);
+  int portNumber = atoi(port);
+  sndmsg(buffer, portNumber);
 }
 
 /**
  * the main function of our application server
  */
 int main() {
-  char firstMessage[2][1024];
-  sqlite3 *db = db_open(DBPATH);
+  char firstMessage[3][1024];
   if (startserver(3000) == 0) {
     printf("Server started successfully!\n");
     char *message = (char *)malloc(1024 * sizeof(char));
@@ -253,18 +312,24 @@ int main() {
       unsigned char *elmisoj =
           base64_decode(message, strlen(message), &sizeafter);
           */
-      splitString(message, firstMessage[0], firstMessage[1]);
+      splitString(message, firstMessage[0], firstMessage[1], firstMessage[2]);
       printf("%s\n", firstMessage[0]);
       User *user = malloc(sizeof(User));
+      sqlite3 *db = db_open(DBPATH);
       user = get_user_from_table(db, firstMessage[0]);
+      db_close(db);
       if (user != NULL && strcmp(user->password, firstMessage[1]) == 0) {
         printf("we in the if muthafucka\n");
         getmsg(message);
-        splitString(message, firstMessage[0], firstMessage[1]);
+        printf("the first message my sir is %s\n", message);
+        splitString(message, firstMessage[0], firstMessage[1], firstMessage[2]);
         if (memcmp(firstMessage[0], "up", 3) == 0) {
-          recieveFile(firstMessage[1]);
+          recieveFile(firstMessage[1], firstMessage[2], *user);
+        } else if (memcmp(firstMessage[0], "list", 5) == 0) {
+          printf("we in the if if muthafucka\n");
+          getFileList(firstMessage[1], user);
         }
-        memset(message, 0, sizeof(message));
+        memset(message, 0, 1024);
       }
     }
   }

@@ -49,5 +49,7 @@ File *get_file_form_table(sqlite3 *db, char filename[]);
 
 int fill_test_data();
 TitleList *get_file_list_from_table(sqlite3 *db);
+TitleList *query_files_for_user(sqlite3 *db, User user);
 
+void free_title_list(TitleList *titleList);
 #endif
