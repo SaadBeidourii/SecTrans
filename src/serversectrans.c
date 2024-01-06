@@ -1,13 +1,16 @@
 #include "../include/dbmanagement.h"
 #include "../include/server.h"
+#include <fcntl.h>
 #include <sqlite3.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define MAX_FILE_SIZE 10485760
 
-void createAndWriteToFile(const char *fileName, const char *fileContent) {
+void createAndWriteToFile(const char *fileName, const char *fileContent,
+                          int fileSize) {
   // Define the directory where the file will be saved
   const char *directory = "./files/";
 
@@ -17,19 +20,19 @@ void createAndWriteToFile(const char *fileName, const char *fileContent) {
   printf("Full Path: %s\n", fullPath);
 
   // Open the file in write mode
-  FILE *file = fopen(fullPath, "w");
-
-  // Check if the file is successfully opened
-  if (file == NULL) {
-    printf("Error opening file %s\n", fullPath);
-    return;
+  //  FILE *file = fopen(fullPath, "w");
+  int fd = open(fullPath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  if (fd == -1) {
+    perror("Error opening PNG file for writing");
+    exit(1);
   }
-
   // Write the content to the file
-  fprintf(file, "%s", fileContent);
+  // fprintf(file, "%s", fileContent);
+  // memcpy(file, fileContent, fileSize);
+  write(fd, fileContent, fileSize);
 
   // Close the file
-  fclose(file);
+  close(fd);
 
   printf("File %s created and written successfully.\n", fullPath);
 }
@@ -57,6 +60,7 @@ void splitString(const char *input, char token1[1024], char token2[1024]) {
 }
 
 void recieveFile(char *fileName) {
+  int counter = 0;
   printf("currently recieving file %s\n", fileName);
   char *fileContent = (char *)malloc(MAX_FILE_SIZE * sizeof(char));
   /*
@@ -69,18 +73,38 @@ void recieveFile(char *fileName) {
 
   char message[1024];
   getmsg(message);
-  printf("%s\n", message);
-  printf("%d\n", atoi(message));
   int fileSize = atoi(message);
-  for (int i = 0; (i) * 1024 < fileSize; i++) {
+  printf("file size: %d\n", fileSize);
+  memset(message, 0, sizeof(message));
+  for (int i = 0; (i + 1) * 1024 < fileSize; i++) {
+    //printf("i: %d\n", i * 1024);
+    size_t currentLength = strlen(fileContent);
     getmsg(message);
-    strncat(fileContent, message, 1024);
-    printf("%s\n", message);
+    /*
+    for (int j = 0; j < 1024; j++) {
+      fileContent[counter] = message[j];
+      counter++;
+    }
+    */
+    // strcpy(fileContent + currentLength, message);
+     strncat(fileContent, message, 1024);
+    // printf("%x\n", *message);
+    for (int j = 0; j < 1024; j++) {
+	    printf("%x", message[j]);
+    }
+    printf("\n");
+
     memset(message, 0, sizeof(message));
   }
   printf("file recieved\n");
+  /*
+  for (int i = 0; i < fileSize; i++) {
+    printf("%c", fileContent[i]);
+  }
+  */
+  printf("THE FILE SIZE IS: %ld\n", sizeof(fileContent));
 
-  createAndWriteToFile(fileName, fileContent);
+  createAndWriteToFile(fileName, fileContent, fileSize);
 }
 
 /**
