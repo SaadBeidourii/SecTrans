@@ -11,6 +11,47 @@
 
 #define MAX_FILE_SIZE 10485760
 #define DOCKER_SERVER_PORT_NUMBER 3000
+#define BUFFER_SIZE 1024
+
+static char encoding_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+                                'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+                                'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
+                                'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
+                                'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+                                'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
+                                'w', 'x', 'y', 'z', '0', '1', '2', '3',
+                                '4', '5', '6', '7', '8', '9', '+', '/'};
+static char *decoding_table = NULL;
+static int mod_table[] = {0, 2, 1};
+
+char *base64_encode(const unsigned char *data,
+                    size_t input_length,
+                    size_t *output_length) {
+
+    *output_length = 4 * ((input_length + 2) / 3);
+
+    char *encoded_data = malloc(*output_length);
+    if (encoded_data == NULL) return NULL;
+
+    for (int i = 0, j = 0; i < input_length;) {
+
+        uint32_t octet_a = i < input_length ? (unsigned char)data[i++] : 0;
+        uint32_t octet_b = i < input_length ? (unsigned char)data[i++] : 0;
+        uint32_t octet_c = i < input_length ? (unsigned char)data[i++] : 0;
+
+        uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
+
+        encoded_data[j++] = encoding_table[(triple >> 3 * 6) & 0x3F];
+        encoded_data[j++] = encoding_table[(triple >> 2 * 6) & 0x3F];
+        encoded_data[j++] = encoding_table[(triple >> 1 * 6) & 0x3F];
+        encoded_data[j++] = encoding_table[(triple >> 0 * 6) & 0x3F];
+    }
+
+    for (int i = 0; i < mod_table[input_length % 3]; i++)
+        encoded_data[*output_length - 1 - i] = '=';
+
+    return encoded_data;
+}
 
 /**
  * Calculates the SHA-256 hash of a string.
@@ -46,6 +87,23 @@ void sha256(const char *input, char outputBuffer[65]) {
 }
 
 /**
+ * Authenticates the user.
+ */
+void authenticate() {
+  printf("Enter your username: ");
+  char username[100];
+  scanf("%s", username);
+  printf("Enter your password: ");
+  char password[100];
+  scanf("%s", password);
+  char message[1024];
+  strcpy(message, username);
+  strcat(message, " ");
+  strcat(message, password);
+  sndmsg(message, DOCKER_SERVER_PORT_NUMBER);
+}
+
+/**
  * Returns the file name from a path.
  *
  * @param path The path to the file.
@@ -65,6 +123,90 @@ const char *getFileName(const char *path) {
   return lastSlash + 1;
 }
 
+// Function to copy file content to a char array
+char *copyFileContent(int fileDescriptor, int *size) {
+  // Seek to the end of the file to determine its size
+  off_t fileSize = lseek(fileDescriptor, 0, SEEK_END);
+
+  *size = fileSize;
+  // Check if seeking was successful
+  if (fileSize == -1) {
+    perror("Error seeking file");
+    return NULL;
+  }
+
+  // Allocate memory for the char array
+  char *fileContent = (char *)malloc(fileSize);
+
+  // Check if memory allocation was successful
+  if (fileContent == NULL) {
+    perror("Error allocating memory");
+    return NULL;
+  }
+
+  // Seek back to the beginning of the file
+  if (lseek(fileDescriptor, 0, SEEK_SET) == -1) {
+    perror("Error seeking file");
+    free(fileContent);
+    return NULL;
+  }
+
+  // Read the file content into the char array
+  ssize_t bytesRead = read(fileDescriptor, fileContent, fileSize);
+  printf("read this much : %ld\n", bytesRead);
+
+  // Check if reading was successful
+  if (bytesRead == -1) {
+    perror("Error reading file");
+    free(fileContent);
+    return NULL;
+  }
+
+  return fileContent;
+}
+
+int readFile(int fd, char **buffer, size_t *size) {
+  // Initialize buffer and size
+  *buffer = NULL;
+  *size = 0;
+
+  // Temporary buffer to read file contents in chunks
+  char tempBuffer[BUFFER_SIZE];
+  ssize_t bytesRead;
+
+  // Loop to read the file in chunks
+  while ((bytesRead = read(fd, tempBuffer, sizeof(tempBuffer))) > 0 &&
+         bytesRead <= MAX_FILE_SIZE) {
+    // Resize the buffer to accommodate the new data
+    *buffer = realloc(*buffer, *size + bytesRead);
+
+    // Check if realloc was successful
+    if (*buffer == NULL) {
+      perror("Error reallocating buffer");
+      return -1;
+    }
+
+    // Copy the new data to the end of the buffer
+    memcpy(*buffer + *size, tempBuffer, bytesRead);
+
+    // Update the size
+    *size += bytesRead;
+  }
+
+  // Check for read errors
+  if (bytesRead < 0) {
+    perror("Error reading file");
+    return -1;
+  }
+
+  if (bytesRead > MAX_FILE_SIZE) {
+    printf("File size is too big\n");
+    return -1;
+  }
+
+  return 0; // Success
+}
+
 /**
  * Sends a file to the server.
  *
@@ -73,12 +215,11 @@ const char *getFileName(const char *path) {
  * @return 0 on success, 1 on failure.
  */
 int send_file(char *filePath) {
-  char *fileContent = (char *)malloc(MAX_FILE_SIZE * sizeof(char));
+  char *fileContent;
   char firstMessage[1024] = "up ";
   char hash[65];
   char buffer[1024];
   int size = 0;
-  //
   // open the file
   int fd;
   fd = open(filePath, O_RDONLY);
@@ -99,6 +240,7 @@ int send_file(char *filePath) {
     exit(1);
   }
 
+  /*
   int counter = 0;
   do {
     counter++;
@@ -108,35 +250,49 @@ int send_file(char *filePath) {
     // write(1, buffer, size);
     memset(buffer, 0, 1024);
   } while (size > 0 && counter <= 1024);
+  */
+  // readFile(fd, &fileContent, &size);
+  fileContent = copyFileContent(fd, &size);
 
-  if (size > 0) {
-    printf("maximum size is 10Mib\n");
-    free(fileContent);
-    return -1;
-  }
+  // close the file
+  close(fd);
+
+  authenticate();
 
   strncat(firstMessage, getFileName(filePath), MIN(99, strlen(filePath)));
   strcat(firstMessage, " ");
   sha256(fileContent, hash);
   strcat(firstMessage, hash);
   sndmsg(firstMessage, DOCKER_SERVER_PORT_NUMBER);
-  sprintf(buffer, "%d", (int)strlen(fileContent));
+  size_t realSizelhrba = 0;
+  char *ELMISAJ = base64_encode((unsigned char *) fileContent, size, &realSizelhrba);
+  memset(buffer, 0, BUFFER_SIZE);
+  sprintf(buffer, "%ld", realSizelhrba);
   sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
-  for (int i = 0; i < counter - 1; i++) {
+  for (int i = 0; i < (realSizelhrba/BUFFER_SIZE) + 1; i++) {
     memset(buffer, 0, 1024);
-    memcpy(buffer, fileContent + (i * 1024), 1024);
-    printf("%s\n", buffer);
+    memcpy(buffer, ELMISAJ + (i * 1024), 1024);
+    for (int j = 0; j < 1024; j++) {
+      printf("%c", buffer[j]);
+    }
+    printf("\n");
     sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
-    sleep(1);
+     sleep(1);
   }
 
+  printf("file sent\n");
+  /*
+  for (int i = 0; i < size; i++) {
+    printf("%c", fileContent[i]);
+  }
+  */
   free(fileContent);
   return 0;
 }
 
 int main(int argc, char *argv[]) {
   if (argc < 2) {
-    fprintf(stderr, "very few arguments\n", argv[0]);
+    fprintf(stderr, "very few arguments %s\n", argv[0]);
     return EXIT_FAILURE;
   }
 
