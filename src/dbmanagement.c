@@ -75,6 +75,84 @@ int create_user_table(sqlite3 *db) {
   }
 }
 
+void free_title_list(TitleList *titleList) {
+    for (int i = 0; i < titleList->size; ++i) {
+        free(titleList->fileTitles[i]);
+    }
+    free(titleList->fileTitles);
+    free(titleList);
+}
+
+TitleList *query_files_for_user(sqlite3 *db, User user) {
+  sqlite3_stmt *stmt;
+  const char *sql;
+
+  // Prepare the SQL statement based on the user's role
+  if (strcmp(user.role, "admin") == 0) {
+    sql = "SELECT name FROM files;";
+  } else if (strcmp(user.role, "manager") == 0) {
+    sql = "SELECT name FROM files WHERE owner IN (SELECT id FROM users WHERE "
+          "role IN ('manager', 'employee'));";
+  } else if (strcmp(user.role, "employee") == 0) {
+    sql = "SELECT name FROM files WHERE owner = ?;";
+  } else {
+    printf("Invalid role for user\n");
+    return NULL;
+  }
+
+  // Prepare the SQL statement
+  if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+    printf("Failed to prepare statement\n");
+    return NULL;
+  }
+
+  // If user is an employee, bind the user id to the parameter
+  if (strcmp(user.role, "employee") == 0) {
+    sqlite3_bind_int(stmt, 1, user.id);
+  }
+
+  // Allocate memory for TitleList
+  TitleList *titleList = malloc(sizeof(TitleList));
+  if (titleList == NULL) {
+    printf("Memory allocation error\n");
+    return NULL;
+  }
+
+  titleList->fileTitles = NULL;
+  titleList->size = 0;
+
+  // Execute the statement and populate the TitleList
+  while (sqlite3_step(stmt) == SQLITE_ROW) {
+    const char *title = (const char *)sqlite3_column_text(stmt, 0);
+
+    // Reallocate memory for file titles
+    titleList->fileTitles =
+        realloc(titleList->fileTitles, (titleList->size + 1) * sizeof(char *));
+    if (titleList->fileTitles == NULL) {
+      printf("Memory allocation error\n");
+      free_title_list(titleList);
+      return NULL;
+    }
+
+    // Allocate memory for the current title and copy the data
+    titleList->fileTitles[titleList->size] = malloc(strlen(title) + 1);
+    if (titleList->fileTitles[titleList->size] == NULL) {
+      printf("Memory allocation error\n");
+      free_title_list(titleList);
+      return NULL;
+    }
+
+    strcpy(titleList->fileTitles[titleList->size], title);
+    titleList->size++;
+  }
+
+  // Finalize the statement
+  sqlite3_finalize(stmt);
+
+  return titleList;
+}
+
+
 /**
  * @brief create_file_table
  * @param db
@@ -213,57 +291,59 @@ int insert_file_into_table(sqlite3 *db, char *name, char *path, char *hash,
  * @param username Username to search for
  * @return User instance or NULL if error or user not found
  */
-User* get_user_from_table(sqlite3 *db, char *username) {
-    User *user = NULL;
-    sqlite3_stmt *stmt;
-    const char *sql = "SELECT id, username, password, role FROM users WHERE username = ?";
-    int rc;
+User *get_user_from_table(sqlite3 *db, char *username) {
+  User *user = NULL;
+  sqlite3_stmt *stmt;
+  const char *sql =
+      "SELECT id, username, password, role FROM users WHERE username = ?";
+  int rc;
 
-    // Prepare the SQL statement
-    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-    if (rc != SQLITE_OK) {
-        fprintf(stderr, "Cannot prepare statement: %s\n", sqlite3_errmsg(db));
-        return NULL;
+  // Prepare the SQL statement
+  rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+  if (rc != SQLITE_OK) {
+    fprintf(stderr, "Cannot prepare statement: %s\n", sqlite3_errmsg(db));
+    return NULL;
+  }
+
+  // Bind the username parameter to the statement
+  sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
+
+  // Execute the statement
+  rc = sqlite3_step(stmt);
+  if (rc == SQLITE_ROW) {
+    // User found, allocate memory for the user struct
+    user = (User *)malloc(sizeof(User));
+    if (user == NULL) {
+      fprintf(stderr, "Memory allocation error\n");
+      sqlite3_finalize(stmt);
+      return NULL;
     }
 
-    // Bind the username parameter to the statement
-    sqlite3_bind_text(stmt, 1, username, -1, SQLITE_STATIC);
+    // Retrieve values from the query result
+    user->id = sqlite3_column_int(stmt, 0);
+    user->username = strdup((const char *)sqlite3_column_text(stmt, 1));
+    user->password = strdup((const char *)sqlite3_column_text(stmt, 2));
+    user->role = strdup((const char *)sqlite3_column_text(stmt, 3));
 
-    // Execute the statement
-    rc = sqlite3_step(stmt);
-    if (rc == SQLITE_ROW) {
-        // User found, allocate memory for the user struct
-        user = (User*)malloc(sizeof(User));
-        if (user == NULL) {
-            fprintf(stderr, "Memory allocation error\n");
-            sqlite3_finalize(stmt);
-            return NULL;
-        }
-
-        // Retrieve values from the query result
-        user->id = sqlite3_column_int(stmt, 0);
-        user->username = strdup((const char*)sqlite3_column_text(stmt, 1));
-        user->password = strdup((const char*)sqlite3_column_text(stmt, 2));
-        user->role = strdup((const char*)sqlite3_column_text(stmt, 3));
-
-        if (user->username == NULL || user->password == NULL || user->role == NULL) {
-            fprintf(stderr, "Memory allocation error\n");
-            free(user->username);
-            free(user->password);
-            free(user->role);
-            free(user);
-            sqlite3_finalize(stmt);
-            return NULL;
-        }
-    } else if (rc != SQLITE_DONE) {
-        // Error or user not found
-        fprintf(stderr, "Execution failed: %s\n", sqlite3_errmsg(db));
+    if (user->username == NULL || user->password == NULL ||
+        user->role == NULL) {
+      fprintf(stderr, "Memory allocation error\n");
+      free(user->username);
+      free(user->password);
+      free(user->role);
+      free(user);
+      sqlite3_finalize(stmt);
+      return NULL;
     }
+  } else if (rc != SQLITE_DONE) {
+    // Error or user not found
+    fprintf(stderr, "Execution failed: %s\n", sqlite3_errmsg(db));
+  }
 
-    // Finalize the statement
-    sqlite3_finalize(stmt);
+  // Finalize the statement
+  sqlite3_finalize(stmt);
 
-    return user;
+  return user;
 }
 
 User *get_user_by_id(sqlite3 *db, int id) {
