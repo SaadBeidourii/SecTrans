@@ -1,12 +1,14 @@
 #include "../include/client.h"
 #include "../include/dbmanagement.h"
 #include "../include/server.h"
+#include <errno.h>
 #include <fcntl.h>
 #include <sqlite3.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #define MAX_FILE_SIZE 10485760
@@ -19,6 +21,34 @@ static char encoding_table[] = {
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/'};
 static char *decoding_table = NULL;
 static int mod_table[] = {0, 2, 1};
+char *base64_encode(const unsigned char *data, size_t input_length,
+                    size_t *output_length) {
+
+  *output_length = 4 * ((input_length + 2) / 3);
+
+  char *encoded_data = malloc(*output_length);
+  if (encoded_data == NULL)
+    return NULL;
+
+  for (int i = 0, j = 0; i < input_length;) {
+
+    uint32_t octet_a = i < input_length ? (unsigned char)data[i++] : 0;
+    uint32_t octet_b = i < input_length ? (unsigned char)data[i++] : 0;
+    uint32_t octet_c = i < input_length ? (unsigned char)data[i++] : 0;
+
+    uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
+
+    encoded_data[j++] = encoding_table[(triple >> 3 * 6) & 0x3F];
+    encoded_data[j++] = encoding_table[(triple >> 2 * 6) & 0x3F];
+    encoded_data[j++] = encoding_table[(triple >> 1 * 6) & 0x3F];
+    encoded_data[j++] = encoding_table[(triple >> 0 * 6) & 0x3F];
+  }
+
+  for (int i = 0; i < mod_table[input_length % 3]; i++)
+    encoded_data[*output_length - 1 - i] = '=';
+
+  return encoded_data;
+}
 /*
 // Function to decode Base64-encoded string to binary data
 unsigned char* base64_decode(const char* encoded_data,size_t input_length,
@@ -295,6 +325,114 @@ void getFileList(char *port, User *user) {
   sndmsg(buffer, portNumber);
 }
 
+// Function to copy file content to a char array
+char *copyFileContent(char *fileName, int *size) {
+  char buffer[1024] = "./files/";
+  strncat(buffer, fileName, 100);
+  int fileDescriptor = open(buffer, O_RDONLY);
+
+  if (fileDescriptor <= 0) {
+    fprintf(stderr, "Couldn't open %s\n", fileName);
+    exit(1);
+  }
+  struct stat stat_data;
+  if (fstat(fileDescriptor, &stat_data) < 0) {
+    fprintf(stderr, "Failed to stat %s: %s\n", fileName, strerror(errno));
+    exit(1);
+  }
+  if (stat_data.st_uid == 0) {
+    fprintf(stderr, "File %s is owned by root\n", fileName);
+    exit(1);
+  }
+  // Seek to the end of the file to determine its size
+  off_t fileSize = lseek(fileDescriptor, 0, SEEK_END);
+
+  *size = fileSize;
+  // Check if seeking was successful
+  if (fileSize == -1) {
+    perror("Error seeking file");
+    return NULL;
+  }
+
+  // Allocate memory for the char array
+  char *fileContent = (char *)malloc(fileSize);
+
+  // Check if memory allocation was successful
+  if (fileContent == NULL) {
+    perror("Error allocating memory");
+    return NULL;
+  }
+
+  // Seek back to the beginning of the file
+  if (lseek(fileDescriptor, 0, SEEK_SET) == -1) {
+    perror("Error seeking file");
+    free(fileContent);
+    return NULL;
+  }
+
+  // Read the file content into the char array
+  ssize_t bytesRead = read(fileDescriptor, fileContent, fileSize);
+  printf("read this much : %ld\n", bytesRead);
+
+  // Check if reading was successful
+  if (bytesRead == -1) {
+    perror("Error reading file");
+    free(fileContent);
+    return NULL;
+  }
+
+  return fileContent;
+}
+
+void sendFile(char *portNumber, char *fileName, User user) {
+  sqlite3 *db = db_open(DBPATH);
+  printf("recieved file name is :%s\n", fileName);
+  File *file = get_file_from_table(db, fileName);
+  printf("%s\n", file->filename);
+  User *fileOwner = get_user_by_id(db, file->owner);
+  printf("owner id is %d\n", fileOwner->id);
+  db_close(db);
+
+
+  if (strcmp(fileOwner->role, "admin") == 0 &&
+      (strcmp(user.role, "manager") == 0 ||
+       strcmp(user.role, "employee") == 0)) {
+    printf("NOT ALLOWED");
+    return;
+  }
+
+  printf("after first if\n");
+  if (strcmp(fileOwner->role, "manager") == 0 &&
+      strcmp(user.role, "employee") == 0) {
+    printf("NOT ALLOWED");
+    return;
+  }
+  printf("after second if\n");
+
+  int size = 0;
+  char *fileContent = copyFileContent(fileName, &size);
+  size_t encodedSize = 0;
+  char *encodedContent =
+      base64_encode((unsigned char *)fileContent, size, &encodedSize);
+  free(fileContent);
+  free(fileOwner);
+  free(file);
+  char message[1024];
+  sprintf(message, "%ld", encodedSize);
+  printf("encoded size: %ld\n", encodedSize);
+  sndmsg(message, atoi(portNumber));
+  memset(message, 0, 1024);
+  for (int i = 0; (i) * 1024 < encodedSize; i++) {
+    printf("i: %d\n", i * 1024);
+    size_t currentLength = strlen(encodedContent);
+    memcpy(message, encodedContent + i * 1024, 1024);
+    sndmsg(message, atoi(portNumber));
+    memset(message, 0, 1024);
+  }
+  printf("file sent\n");
+  free(encodedContent);
+}
+
 /**
  * the main function of our application server
  */
@@ -319,15 +457,15 @@ int main() {
       user = get_user_from_table(db, firstMessage[0]);
       db_close(db);
       if (user != NULL && strcmp(user->password, firstMessage[1]) == 0) {
-        printf("we in the if muthafucka\n");
         getmsg(message);
         printf("the first message my sir is %s\n", message);
         splitString(message, firstMessage[0], firstMessage[1], firstMessage[2]);
         if (memcmp(firstMessage[0], "up", 3) == 0) {
           recieveFile(firstMessage[1], firstMessage[2], *user);
         } else if (memcmp(firstMessage[0], "list", 5) == 0) {
-          printf("we in the if if muthafucka\n");
           getFileList(firstMessage[1], user);
+        } else if (memcmp(firstMessage[0], "down", 5) == 0) {
+          sendFile(firstMessage[1], firstMessage[2], *user);
         }
         memset(message, 0, 1024);
       }
