@@ -9,6 +9,6 @@ COPY . /app
 
 RUN make
 
-EXPOSE 4000
+EXPOSE 3000
 
 CMD ["sh", "-c", "./bin/initdb && ./bin/server"]

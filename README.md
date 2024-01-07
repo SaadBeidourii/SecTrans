@@ -1,5 +1,12 @@
 # SecTrans for MacroHard
-
+# How to test ?
+```bash
+mkdir obj
+mkdir bin
+make
+./bin/server
+./bin/client {your options}
+```
 # How to run ?
 ``` bash
 mkdir obj
@@ -8,7 +15,7 @@ mkdir bin
 ## run server:
 ``` bash
 docker build -t sectrans .
-docker run -p 4000:3000 -it sectrans
+docker run -p 3000:3000 -it sectrans
 ```
 > hint, you may need sudo depending on your system and your rights
 
