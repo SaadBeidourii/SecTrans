@@ -55,8 +55,7 @@ void base64_cleanup() { free(decoding_table); }
 
 void build_decoding_table() {
 
-
-  decoding_table = malloc(256);
+  decoding_table = malloc(64 * sizeof(int));
   printf("error here ?\n");
 
   for (int i = 0; i < 64; i++)
@@ -67,8 +66,10 @@ unsigned char *base64_decode(const char *data, size_t input_length,
                              size_t *output_length) {
 
   printf("the output length is %ld\n", *output_length);
-  if (decoding_table == NULL){
-    build_decoding_table();
+  if (decoding_table == NULL) {
+	  printf("here\n");
+	  build_decoding_table();
+	  printf("here\n");
   }
 
   if (input_length % 4 != 0)
@@ -106,7 +107,6 @@ unsigned char *base64_decode(const char *data, size_t input_length,
 
   return decoded_data;
 }
-
 
 void createAndWriteToFile(const char *fileName, const char *fileContent,
                           int fileSize) {
@@ -381,7 +381,7 @@ int send_file(char *filePath) {
 
 int getFileList() {
   char buffer[1024] = "list ";
-  char portBuffer[5];
+  char portBuffer[15];
   authenticate();
   int i = 0;
   do {
@@ -413,19 +413,29 @@ int downloadFile(char *fileName) {
   sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
   memset(buffer, 0, 1024);
   getmsg(buffer);
-  printf("the encoded size is %s\n", buffer);
   int encodedSize = atoi(buffer);
-  char *encodedContent = malloc(encodedSize);
-  for(int i = 0; i < (encodedSize / BUFFER_SIZE) + 1; i++) {
-    memset(buffer, 0, 1024);
+  char *encodedContent = calloc(encodedSize, sizeof(char));
+  /*
+  printf("buffer %x\n", buffer);
+  printf("encodedContent %x\n", encodedContent);
+  */
+  printf("buffer %x\n", buffer);
+  printf("encodedContent %x\n", encodedContent);
+  printf("encodedContent %x\n", encodedContent + encodedSize);
+  printf("encodedSize : %d\n", encodedSize);
+
+  for (int i = 0; i * 1024 < encodedSize ; i++) {
+    memset(buffer, 0, 1023);
     getmsg(buffer);
-    memcpy(encodedContent + (i * 1024), buffer, 1024);
+    printf("recieved : %s\n", buffer);
+    strncat(encodedContent, buffer, 1024);
   }
   printf("we still safe ova here\n");
-  printf("encodedContent %x\n", encodedContent);
+  // printf("encodedContent %x\n", encodedContent);
   printf("decodingtable %x\n", decoding_table);
   size_t decodedSize = 0;
-  unsigned char *decodedContent = base64_decode(encodedContent, encodedSize, &decodedSize);
+  unsigned char *decodedContent =
+      base64_decode(encodedContent, encodedSize, &decodedSize);
   createAndWriteToFile(fileName, (char *)decodedContent, decodedSize);
   return 0;
 }
