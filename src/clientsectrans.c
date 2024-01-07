@@ -65,7 +65,6 @@ void build_decoding_table() {
 unsigned char *base64_decode(const char *data, size_t input_length,
                              size_t *output_length) {
 
-  printf("the output length is %ld\n", *output_length);
   if (decoding_table == NULL) {
 	  printf("here\n");
 	  build_decoding_table();
@@ -83,7 +82,9 @@ unsigned char *base64_decode(const char *data, size_t input_length,
     (*output_length)--;
 
   printf("the output length is %ld\n", *output_length);
+  printf("el data\n");
   unsigned char *decoded_data = malloc(*output_length);
+  printf("el data\n");
   if (decoded_data == NULL)
     return NULL;
 
@@ -295,6 +296,43 @@ int readFile(int fd, char **buffer, size_t *size) {
   return 0; // Success
 }
 
+void splitString(const char *input, char token1[1024], char token2[1024],
+                 char token3[1024]) {
+  memset(token1, 0, 1024);
+  memset(token2, 0, 1024);
+  memset(token3, 0, 1024);
+  // Use strtok to get the first token
+  char *firstToken = strtok((char *)input, " ");
+  if (firstToken != NULL) {
+    strcpy(token1, firstToken);
+
+    // Use strtok to get the second token
+    char *secondToken = strtok(NULL, " ");
+    if (secondToken != NULL) {
+      strcpy(token2, secondToken);
+
+      // Use strtok to get the third token
+      char *thirdToken = strtok(NULL, " ");
+      if (thirdToken != NULL) {
+        strcpy(token3, thirdToken);
+      } else {
+        // If there's no third token, set the third token to an empty string
+        token3[0] = '\0';
+      }
+    } else {
+      // If there's no second token, set both the second and third tokens to an
+      // empty string
+      token2[0] = '\0';
+      token3[0] = '\0';
+    }
+  } else {
+    // If there's no first token, set all tokens to an empty string
+    token1[0] = '\0';
+    token2[0] = '\0';
+    token3[0] = '\0';
+  }
+}
+
 /**
  * Sends a file to the server.
  *
@@ -413,16 +451,13 @@ int downloadFile(char *fileName) {
   sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
   memset(buffer, 0, 1024);
   getmsg(buffer);
-  int encodedSize = atoi(buffer);
+  splitString(buffer, firstMessage[0],firstMessage[1] , firstMessage[2]);
+  int encodedSize = atoi(firstMessage[0]);
+  char hash[65];
+  strncpy(hash, firstMessage[1], 64);
+  hash[64] = '\0';
+  printf("encodedSize %d\n", encodedSize);
   char *encodedContent = calloc(encodedSize, sizeof(char));
-  /*
-  printf("buffer %x\n", buffer);
-  printf("encodedContent %x\n", encodedContent);
-  */
-  printf("buffer %x\n", buffer);
-  printf("encodedContent %x\n", encodedContent);
-  printf("encodedContent %x\n", encodedContent + encodedSize);
-  printf("encodedSize : %d\n", encodedSize);
 
   for (int i = 0; i * 1024 < encodedSize ; i++) {
     memset(buffer, 0, 1023);
@@ -430,13 +465,19 @@ int downloadFile(char *fileName) {
     printf("recieved : %s\n", buffer);
     strncat(encodedContent, buffer, 1024);
   }
-  printf("we still safe ova here\n");
   // printf("encodedContent %x\n", encodedContent);
-  printf("decodingtable %x\n", decoding_table);
   size_t decodedSize = 0;
   unsigned char *decodedContent =
       base64_decode(encodedContent, encodedSize, &decodedSize);
+  free(encodedContent);
+  char calculatedHash[65];
+  sha256(decodedContent, calculatedHash);
+  if(strcmp(calculatedHash, hash) != 0){
+	  printf("the hashes of the files are different, the recieved file is corrupted!\n");
+	  return -1;
+  }
   createAndWriteToFile(fileName, (char *)decodedContent, decodedSize);
+  free(decodedContent);
   return 0;
 }
 

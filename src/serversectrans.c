@@ -407,7 +407,6 @@ void sendFile(char *portNumber, char *fileName, User user) {
     printf("NOT ALLOWED");
     return;
   }
-  printf("after second if\n");
 
   int size = 0;
   char *fileContent = copyFileContent(fileName, &size);
@@ -415,11 +414,10 @@ void sendFile(char *portNumber, char *fileName, User user) {
   char *encodedContent =
       base64_encode((unsigned char *)fileContent, size, &encodedSize);
   free(fileContent);
-  free(fileOwner);
-  free(file);
   char message[1024];
   sprintf(message, "%ld", encodedSize);
-  printf("encoded size: %ld\n", encodedSize);
+  strcat(message, " ");
+  strcat(message, file->hash);
   sndmsg(message, atoi(portNumber));
   memset(message, 0, 1024);
   for (int i = 0; (i) * 1024 < encodedSize; i++) {
@@ -430,6 +428,8 @@ void sendFile(char *portNumber, char *fileName, User user) {
     memset(message, 0, 1024);
   }
   printf("file sent\n");
+  free(fileOwner);
+  free(file);
   free(encodedContent);
 }
 
