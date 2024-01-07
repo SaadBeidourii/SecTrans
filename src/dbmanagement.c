@@ -46,7 +46,10 @@ sqlite3 *db_open(char *db_name) {
  * @brief db_close
  * @param db
  */
-void db_close(sqlite3 *db) { sqlite3_close(db); }
+void db_close(sqlite3 *db) {
+  sqlite3_close(db);
+  printf("Closed database successfully\n");
+}
 
 /**
  * @brief create_user_table
@@ -76,11 +79,11 @@ int create_user_table(sqlite3 *db) {
 }
 
 void free_title_list(TitleList *titleList) {
-    for (int i = 0; i < titleList->size; ++i) {
-        free(titleList->fileTitles[i]);
-    }
-    free(titleList->fileTitles);
-    free(titleList);
+  for (int i = 0; i < titleList->size; ++i) {
+    free(titleList->fileTitles[i]);
+  }
+  free(titleList->fileTitles);
+  free(titleList);
 }
 
 TitleList *query_files_for_user(sqlite3 *db, User user) {
@@ -151,7 +154,6 @@ TitleList *query_files_for_user(sqlite3 *db, User user) {
 
   return titleList;
 }
-
 
 /**
  * @brief create_file_table
@@ -351,14 +353,20 @@ User *get_user_by_id(sqlite3 *db, int id) {
   int rc;
   sqlite3_stmt *res;
 
+  /*
   char *sql = malloc(104);
   sprintf(sql, "SELECT * FROM users WHERE id = '%d';", id);
+  */
+  printf("the id we want is %d\n", id);
+  char sql[] = "SELECT * FROM users WHERE id = ?";
 
   rc = sqlite3_prepare_v2(db, sql, -1, &res, 0);
+
+  sqlite3_bind_int(res, 1, id);
+
   if (rc != SQLITE_OK) {
     fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db));
     sqlite3_free(zErrMsg);
-    free(sql);
     return NULL;
   }
 
@@ -383,7 +391,6 @@ User *get_user_by_id(sqlite3 *db, int id) {
   }
 
   sqlite3_finalize(res);
-  free(sql);
   return user;
 }
 
@@ -411,26 +418,34 @@ File *get_file_from_table(sqlite3 *db, char filename[]) {
     return NULL;
   }
 
+  sqlite3_bind_text(res, 1, filename, -1, SQLITE_STATIC);
+
   File *file = malloc(sizeof(File));
   file->id = -1;
   file->filename = NULL;
   file->path = NULL;
   file->hash = NULL;
+  file->owner = 0;
+  printf("file id in sql func is : %d\n", file->id);
 
   rc = sqlite3_step(res);
   if (rc == SQLITE_ROW) {
+    printf("bruh what %d\n", sqlite3_column_int(res, 0));
     file->id = sqlite3_column_int(res, 0);
-    file->filename = malloc(strlen(sqlite3_column_text(res, 1)) + 1);
-    strncpy(file->filename, sqlite3_column_text(res, 1),
-            MIN(strlen(sqlite3_column_text(res, 1)) + 1, MAX_STRING_LENGTH));
-    file->path = malloc(strlen(sqlite3_column_text(res, 2)) + 1);
-    strncpy(file->path, sqlite3_column_text(res, 2),
-            MIN(strlen(sqlite3_column_text(res, 2)) + 1, MAX_STRING_LENGTH));
-    file->hash = malloc(strlen(sqlite3_column_text(res, 3)) + 1);
-    strncpy(file->hash, sqlite3_column_text(res, 3),
-            MIN(strlen(sqlite3_column_text(res, 3)) + 1, MAX_STRING_LENGTH));
+    file->filename = malloc(strlen((char *)sqlite3_column_text(res, 1)) + 1);
+    strncpy(file->filename, (char *)sqlite3_column_text(res, 1),
+            MIN(strlen((char *)sqlite3_column_text(res, 1)) + 1, MAX_STRING_LENGTH));
+    file->path = malloc(strlen((char *)sqlite3_column_text(res, 2)) + 1);
+    strncpy(file->path, (char *)sqlite3_column_text(res, 2),
+            MIN(strlen((char *)sqlite3_column_text(res, 2)) + 1, MAX_STRING_LENGTH));
+    file->hash = malloc(strlen((char *)sqlite3_column_text(res, 3)) + 1);
+    strncpy(file->hash, (char *)sqlite3_column_text(res, 3),
+            MIN(strlen((char *)sqlite3_column_text(res, 3)) + 1, MAX_STRING_LENGTH));
+    file->owner = sqlite3_column_int(res, 4);
   }
 
+  printf("IM HERE MUTHAFUCLKAAAAA\n");
+  printf("file id in sql func is : %d", file->id);
   sqlite3_finalize(res);
   return file;
 }

@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -I./include
+CFLAGS = -Wall -g -Wextra -I./include
 LDFLAGS = -L./lib -lclient -lserver -lsqlite3 -lcrypto -lssl -Wl,-rpath=./lib
 LDFLAGSCLIENT = -L./lib -lclient -lserver  -lcrypto -lssl -Wl,-rpath=./lib
 

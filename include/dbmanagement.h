@@ -45,7 +45,7 @@ int insert_file_into_table(sqlite3 *db, char *name, char *path, char *hash,
                            int owner);
 User *get_user_from_table(sqlite3 *db, char *username);
 User *get_user_by_id(sqlite3 *db, int id);
-File *get_file_form_table(sqlite3 *db, char filename[]);
+File *get_file_from_table(sqlite3 *db, char filename[]);
 
 int fill_test_data();
 TitleList *get_file_list_from_table(sqlite3 *db);

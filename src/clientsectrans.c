@@ -14,44 +14,127 @@
 #define DOCKER_SERVER_PORT_NUMBER 3000
 #define BUFFER_SIZE 1024
 
-static char encoding_table[] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
-                                'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-                                'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X',
-                                'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f',
-                                'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
-                                'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
-                                'w', 'x', 'y', 'z', '0', '1', '2', '3',
-                                '4', '5', '6', '7', '8', '9', '+', '/'};
+static char encoding_table[] = {
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+    'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '+', '/'};
 static char *decoding_table = NULL;
 static int mod_table[] = {0, 2, 1};
 
-char *base64_encode(const unsigned char *data,
-                    size_t input_length,
+char *base64_encode(const unsigned char *data, size_t input_length,
                     size_t *output_length) {
 
-    *output_length = 4 * ((input_length + 2) / 3);
+  *output_length = 4 * ((input_length + 2) / 3);
 
-    char *encoded_data = malloc(*output_length);
-    if (encoded_data == NULL) return NULL;
+  char *encoded_data = malloc(*output_length);
+  if (encoded_data == NULL)
+    return NULL;
 
-    for (int i = 0, j = 0; i < input_length;) {
+  for (int i = 0, j = 0; i < input_length;) {
 
-        uint32_t octet_a = i < input_length ? (unsigned char)data[i++] : 0;
-        uint32_t octet_b = i < input_length ? (unsigned char)data[i++] : 0;
-        uint32_t octet_c = i < input_length ? (unsigned char)data[i++] : 0;
+    uint32_t octet_a = i < input_length ? (unsigned char)data[i++] : 0;
+    uint32_t octet_b = i < input_length ? (unsigned char)data[i++] : 0;
+    uint32_t octet_c = i < input_length ? (unsigned char)data[i++] : 0;
 
-        uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
+    uint32_t triple = (octet_a << 0x10) + (octet_b << 0x08) + octet_c;
 
-        encoded_data[j++] = encoding_table[(triple >> 3 * 6) & 0x3F];
-        encoded_data[j++] = encoding_table[(triple >> 2 * 6) & 0x3F];
-        encoded_data[j++] = encoding_table[(triple >> 1 * 6) & 0x3F];
-        encoded_data[j++] = encoding_table[(triple >> 0 * 6) & 0x3F];
-    }
+    encoded_data[j++] = encoding_table[(triple >> 3 * 6) & 0x3F];
+    encoded_data[j++] = encoding_table[(triple >> 2 * 6) & 0x3F];
+    encoded_data[j++] = encoding_table[(triple >> 1 * 6) & 0x3F];
+    encoded_data[j++] = encoding_table[(triple >> 0 * 6) & 0x3F];
+  }
 
-    for (int i = 0; i < mod_table[input_length % 3]; i++)
-        encoded_data[*output_length - 1 - i] = '=';
+  for (int i = 0; i < mod_table[input_length % 3]; i++)
+    encoded_data[*output_length - 1 - i] = '=';
 
-    return encoded_data;
+  return encoded_data;
+}
+void base64_cleanup() { free(decoding_table); }
+
+void build_decoding_table() {
+
+  decoding_table = malloc(64 * sizeof(int));
+  printf("error here ?\n");
+
+  for (int i = 0; i < 64; i++)
+    decoding_table[(unsigned char)encoding_table[i]] = i;
+}
+
+unsigned char *base64_decode(const char *data, size_t input_length,
+                             size_t *output_length) {
+
+  if (decoding_table == NULL) {
+	  printf("here\n");
+	  build_decoding_table();
+	  printf("here\n");
+  }
+
+  if (input_length % 4 != 0)
+    return NULL;
+
+  *output_length = input_length / 4 * 3;
+
+  if (data[input_length - 1] == '=')
+    (*output_length)--;
+  if (data[input_length - 2] == '=')
+    (*output_length)--;
+
+  printf("the output length is %ld\n", *output_length);
+  printf("el data\n");
+  unsigned char *decoded_data = malloc(*output_length);
+  printf("el data\n");
+  if (decoded_data == NULL)
+    return NULL;
+
+  for (int i = 0, j = 0; i < input_length;) {
+
+    uint32_t sextet_a = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+    uint32_t sextet_b = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+    uint32_t sextet_c = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+    uint32_t sextet_d = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+
+    uint32_t triple = (sextet_a << 3 * 6) + (sextet_b << 2 * 6) +
+                      (sextet_c << 1 * 6) + (sextet_d << 0 * 6);
+
+    if (j < *output_length)
+      decoded_data[j++] = (triple >> 2 * 8) & 0xFF;
+    if (j < *output_length)
+      decoded_data[j++] = (triple >> 1 * 8) & 0xFF;
+    if (j < *output_length)
+      decoded_data[j++] = (triple >> 0 * 8) & 0xFF;
+  }
+
+  return decoded_data;
+}
+
+void createAndWriteToFile(const char *fileName, const char *fileContent,
+                          int fileSize) {
+  // Define the directory where the file will be saved
+  const char *directory = "./";
+
+  // Concatenate the directory and file name to get the full path
+  char fullPath[256]; // Adjust the size as needed
+  snprintf(fullPath, sizeof(fullPath), "%s%s", directory, fileName);
+  printf("Full Path: %s\n", fullPath);
+
+  // Open the file in write mode
+  //  FILE *file = fopen(fullPath, "w");
+  int fd = open(fullPath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  if (fd == -1) {
+    perror("Error opening PNG file for writing");
+    exit(1);
+  }
+  // Write the content to the file
+  // fprintf(file, "%s", fileContent);
+  // memcpy(file, fileContent, fileSize);
+  write(fd, fileContent, fileSize);
+
+  // Close the file
+  close(fd);
+
+  printf("File %s created and written successfully.\n", fullPath);
 }
 
 /**
@@ -93,14 +176,19 @@ void sha256(const char *input, char outputBuffer[65]) {
 void authenticate() {
   printf("Enter your username: ");
   char username[100];
-  scanf("%s", username);
+  fgets(username, 99, stdin);
   printf("Enter your password: ");
   char password[100];
-  scanf("%s", password);
+  fgets(password, 99, stdin);
   char message[1024];
+  printf("username: %s\n", username);
+  printf("password: %s\n", password);
+  username[strlen(username) - 1] = '\0';
+  password[strlen(password) - 1] = '\0';
   strcpy(message, username);
   strcat(message, " ");
   strcat(message, password);
+  printf("message: %s\n", message);
   sndmsg(message, DOCKER_SERVER_PORT_NUMBER);
 }
 
@@ -208,6 +296,43 @@ int readFile(int fd, char **buffer, size_t *size) {
   return 0; // Success
 }
 
+void splitString(const char *input, char token1[1024], char token2[1024],
+                 char token3[1024]) {
+  memset(token1, 0, 1024);
+  memset(token2, 0, 1024);
+  memset(token3, 0, 1024);
+  // Use strtok to get the first token
+  char *firstToken = strtok((char *)input, " ");
+  if (firstToken != NULL) {
+    strcpy(token1, firstToken);
+
+    // Use strtok to get the second token
+    char *secondToken = strtok(NULL, " ");
+    if (secondToken != NULL) {
+      strcpy(token2, secondToken);
+
+      // Use strtok to get the third token
+      char *thirdToken = strtok(NULL, " ");
+      if (thirdToken != NULL) {
+        strcpy(token3, thirdToken);
+      } else {
+        // If there's no third token, set the third token to an empty string
+        token3[0] = '\0';
+      }
+    } else {
+      // If there's no second token, set both the second and third tokens to an
+      // empty string
+      token2[0] = '\0';
+      token3[0] = '\0';
+    }
+  } else {
+    // If there's no first token, set all tokens to an empty string
+    token1[0] = '\0';
+    token2[0] = '\0';
+    token3[0] = '\0';
+  }
+}
+
 /**
  * Sends a file to the server.
  *
@@ -266,11 +391,12 @@ int send_file(char *filePath) {
   strcat(firstMessage, hash);
   sndmsg(firstMessage, DOCKER_SERVER_PORT_NUMBER);
   size_t realSizelhrba = 0;
-  char *ELMISAJ = base64_encode((unsigned char *) fileContent, size, &realSizelhrba);
+  char *ELMISAJ =
+      base64_encode((unsigned char *)fileContent, size, &realSizelhrba);
   memset(buffer, 0, BUFFER_SIZE);
   sprintf(buffer, "%ld", realSizelhrba);
   sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
-  for (int i = 0; i < (realSizelhrba/BUFFER_SIZE) + 1; i++) {
+  for (int i = 0; i < (realSizelhrba / BUFFER_SIZE) + 1; i++) {
     memset(buffer, 0, 1024);
     memcpy(buffer, ELMISAJ + (i * 1024), 1024);
     for (int j = 0; j < 1024; j++) {
@@ -278,7 +404,7 @@ int send_file(char *filePath) {
     }
     printf("\n");
     sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
-     //sleep(1);
+    // sleep(1);
   }
 
   printf("file sent\n");
@@ -293,19 +419,65 @@ int send_file(char *filePath) {
 
 int getFileList() {
   char buffer[1024] = "list ";
-  char portBuffer[5];
+  char portBuffer[15];
   authenticate();
   int i = 0;
-  do{
-	  i++;
-  }while(startserver(DOCKER_SERVER_PORT_NUMBER + i) != 0);
+  do {
+    i++;
+  } while (startserver(DOCKER_SERVER_PORT_NUMBER + i) != 0);
   sprintf(portBuffer, "%d", DOCKER_SERVER_PORT_NUMBER + i);
-  strcat(buffer, portBuffer); 
+  strcat(buffer, portBuffer);
   sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
   memset(buffer, 0, 1024);
   getmsg(buffer);
   printf("%s\n", buffer);
   stopserver();
+  return 0;
+}
+
+int downloadFile(char *fileName) {
+  char buffer[1024] = "down ";
+  char firstMessage[3][1024];
+  char portBuffer[5];
+  authenticate();
+  int i = 0;
+  do {
+    i++;
+  } while (startserver(DOCKER_SERVER_PORT_NUMBER + i) != 0);
+  sprintf(portBuffer, "%d", DOCKER_SERVER_PORT_NUMBER + i);
+  strcat(buffer, portBuffer);
+  strcat(buffer, " ");
+  strcat(buffer, fileName);
+  sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
+  memset(buffer, 0, 1024);
+  getmsg(buffer);
+  splitString(buffer, firstMessage[0],firstMessage[1] , firstMessage[2]);
+  int encodedSize = atoi(firstMessage[0]);
+  char hash[65];
+  strncpy(hash, firstMessage[1], 64);
+  hash[64] = '\0';
+  printf("encodedSize %d\n", encodedSize);
+  char *encodedContent = calloc(encodedSize, sizeof(char));
+
+  for (int i = 0; i * 1024 < encodedSize ; i++) {
+    memset(buffer, 0, 1023);
+    getmsg(buffer);
+    printf("recieved : %s\n", buffer);
+    strncat(encodedContent, buffer, 1024);
+  }
+  // printf("encodedContent %x\n", encodedContent);
+  size_t decodedSize = 0;
+  unsigned char *decodedContent =
+      base64_decode(encodedContent, encodedSize, &decodedSize);
+  free(encodedContent);
+  char calculatedHash[65];
+  sha256(decodedContent, calculatedHash);
+  if(strcmp(calculatedHash, hash) != 0){
+	  printf("the hashes of the files are different, the recieved file is corrupted!\n");
+	  return -1;
+  }
+  createAndWriteToFile(fileName, (char *)decodedContent, decodedSize);
+  free(decodedContent);
   return 0;
 }
 
@@ -319,11 +491,14 @@ int main(int argc, char *argv[]) {
   if (strcmp(argv[1], "-up") == 0 && argc == 3) {
     send_file(argv[2]);
   } else if (strcmp(argv[1], "-list") == 0 && argc == 2) {
-      getFileList();
-  }/* else if (strcmp(argv[1], "-down") == 0 && argc == 3) {
-      downloadFunction(argv[2]);
-  }*/
-  else {
+    getFileList();
+  } else if (strcmp(argv[1], "-down") == 0 && argc == 3) {
+    if (strlen(argv[2]) > 100) {
+      printf("the file name can't be over 100 characters long\n");
+      return -1;
+    }
+    downloadFile(argv[2]);
+  } else {
     fprintf(stderr, "Invalid command-line options\n");
   }
 
