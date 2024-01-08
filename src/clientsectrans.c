@@ -394,7 +394,7 @@ int send_file(char *filePath) {
   char *ELMISAJ =
       base64_encode((unsigned char *)fileContent, size, &realSizelhrba);
   memset(buffer, 0, BUFFER_SIZE);
-  sprintf(buffer, "%ld", realSizelhrba);
+  sprintf(buffer, "%04d", realSizelhrba);
   sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
   for (int i = 0; i < (realSizelhrba / BUFFER_SIZE) + 1; i++) {
     memset(buffer, 0, 1024);
