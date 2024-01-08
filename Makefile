@@ -16,20 +16,22 @@ CLIENT_SRC = $(SRC_DIR)/clientsectrans.c
 INITDB_SRC = $(SRC_DIR)/initdb.c
 DBMANAGEMENT_SRC = $(SRC_DIR)/dbmanagement.c
 FAKE_SRC = $(SRC_DIR)/fake.c
+ENCRYPTION_SRC = $(SRC_DIR)/encryption.c
 
 SERVER_OBJ = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SERVER_SRC))
 CLIENT_OBJ = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(CLIENT_SRC))
 INITDB_OBJ = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(INITDB_SRC))
 DBMANAGEMENT_OBJ = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(DBMANAGEMENT_SRC))
 FAKE_OBJ = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(FAKE_SRC))
+ENCRYPTION_OBJ = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(ENCRYPTION_SRC))
 
 # Targets
-all: server client initdb
+all: server client initdb 
 
 server: $(SERVER_OBJ) $(DBMANAGEMENT_OBJ)
 	$(CC) $(CFLAGS) -o $(BIN_DIR)/server $^ $(LDFLAGS)
 
-client: $(CLIENT_OBJ)
+client: $(CLIENT_OBJ) $(ENCRYPTION_OBJ)
 	$(CC) $(CFLAGS) -o $(BIN_DIR)/client $^ $(LDFLAGSCLIENT)
 
 initdb: $(INITDB_OBJ) $(DBMANAGEMENT_OBJ)

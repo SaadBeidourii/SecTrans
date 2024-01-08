@@ -1,12 +1,16 @@
 #include "../include/client.h"
+#include "../include/encryption.h"
 #include "../include/server.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <openssl/evp.h>
+#include <openssl/rand.h>
+#include <openssl/dh.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
+#include <openssl/err.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -66,9 +70,9 @@ unsigned char *base64_decode(const char *data, size_t input_length,
                              size_t *output_length) {
 
   if (decoding_table == NULL) {
-	  printf("here\n");
-	  build_decoding_table();
-	  printf("here\n");
+    printf("here\n");
+    build_decoding_table();
+    printf("here\n");
   }
 
   if (input_length % 4 != 0)
@@ -395,6 +399,7 @@ int send_file(char *filePath) {
       base64_encode((unsigned char *)fileContent, size, &realSizelhrba);
   memset(buffer, 0, BUFFER_SIZE);
   sprintf(buffer, "%ld", realSizelhrba);
+  printf("the encoded size is %ld", realSizelhrba);
   sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
   for (int i = 0; i < (realSizelhrba / BUFFER_SIZE) + 1; i++) {
     memset(buffer, 0, 1024);
@@ -451,7 +456,7 @@ int downloadFile(char *fileName) {
   sndmsg(buffer, DOCKER_SERVER_PORT_NUMBER);
   memset(buffer, 0, 1024);
   getmsg(buffer);
-  splitString(buffer, firstMessage[0],firstMessage[1] , firstMessage[2]);
+  splitString(buffer, firstMessage[0], firstMessage[1], firstMessage[2]);
   int encodedSize = atoi(firstMessage[0]);
   char hash[65];
   strncpy(hash, firstMessage[1], 64);
@@ -459,7 +464,7 @@ int downloadFile(char *fileName) {
   printf("encodedSize %d\n", encodedSize);
   char *encodedContent = calloc(encodedSize, sizeof(char));
 
-  for (int i = 0; i * 1024 < encodedSize ; i++) {
+  for (int i = 0; i * 1024 < encodedSize; i++) {
     memset(buffer, 0, 1023);
     getmsg(buffer);
     printf("recieved : %s\n", buffer);
@@ -472,9 +477,10 @@ int downloadFile(char *fileName) {
   free(encodedContent);
   char calculatedHash[65];
   sha256(decodedContent, calculatedHash);
-  if(strcmp(calculatedHash, hash) != 0){
-	  printf("the hashes of the files are different, the recieved file is corrupted!\n");
-	  return -1;
+  if (strcmp(calculatedHash, hash) != 0) {
+    printf("the hashes of the files are different, the recieved file is "
+           "corrupted!\n");
+    return -1;
   }
   createAndWriteToFile(fileName, (char *)decodedContent, decodedSize);
   free(decodedContent);
@@ -482,6 +488,15 @@ int downloadFile(char *fileName) {
 }
 
 int main(int argc, char *argv[]) {
+  EVP_PKEY *public_key = NULL;
+  EVP_PKEY *dh_params = NULL;
+  unsigned char *shared_secret = NULL;
+  size_t shared_secret_len = 0;
+  size_t public_key_len = 0;
+  RAND_poll();
+  generateDHParameters(&dh_params);
+  generateDHKeyPair(dh_params, &public_key);
+  printf("%d\n", EVP_PKEY_print_public(stdout, public_key, 0, NULL));
   if (argc < 2) {
     fprintf(stderr, "very few arguments %s\n", argv[0]);
     return EXIT_FAILURE;

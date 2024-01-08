@@ -158,6 +158,7 @@ void createAndWriteToFile(const char *fileName, const char *fileContent,
   // Open the file in write mode
   //  FILE *file = fopen(fullPath, "w");
   int fd = open(fullPath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+
   if (fd == -1) {
     perror("Error opening PNG file for writing");
     exit(1);

@@ -1,22 +1,28 @@
 #ifndef ENCRYPTION_H
 #define ENCRYPTION_H
 
-typedef struct {
-    char *blocks[1024];
-    char signature[1024];
-} data;
+#include <openssl/rsa.h>
 
-void encrypt(char *input, char *output, char *key);
-void decrypt(char *input, char *output, char *key);
-void encrypt_file(char *input, char *output, char *key);
-void decrypt_file(char *input, char *output, char *key);
-void sign(char *input, char *output, char *key);
+void extractDHPublicKey(EVP_PKEY *keypair, unsigned char **public_key_data,
+                        size_t *public_key_len);
 
-RSA* generateRSAKeyPair();
-RSA* extractRSAPublicKey(RSA* rsa);
-RSA* extractRSAPrivateKey(RSA* rsa);
-unsigned char* rsaEncrypt(const char* plaintext, RSA* rsa);
-unsigned char* rsaDecrypt(const unsigned char* ciphertext, RSA* rsa);
+void computeDHSecret(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key,
+                     unsigned char **secret, size_t *secret_len);
 
+void generateDHKeyPair(EVP_PKEY *params, EVP_PKEY **keypair);
+
+void generateDHParameters(EVP_PKEY **params);
+
+void handleErrors(void);
+
+int aes_decrypt(const unsigned char *ciphertext, int ciphertext_len,
+                const unsigned char *key, const unsigned char *iv,
+                unsigned char *plaintext);
+
+int aes_encrypt(const unsigned char *plaintext, int plaintext_len,
+                const unsigned char *key, const unsigned char *iv,
+                unsigned char *ciphertext);
+
+void generate_random_iv(unsigned char *iv, int size);
 
 #endif
